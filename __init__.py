@@ -112,7 +112,7 @@ class MycroftSkillsManager(object):
                 listdir(self.skills_dir))]
             for skill_folder in skill_list:
                 skills.append(skill_folder)
-                self._is_skill(skill_folder)
+                self.read_skill_folder(skill_folder)
         LOG.info("scanned: " + str(skills))
         return skills
 
@@ -141,7 +141,7 @@ class MycroftSkillsManager(object):
         LOG.info("scanned: " + str(skills))
         return skills
 
-    def _is_skill(self, skill_folder):
+    def is_skill(self, skill_folder):
         """
             Check if folder is a skill and perform mapping.
         """
@@ -152,6 +152,10 @@ class MycroftSkillsManager(object):
             LOG.warning("not a skill!")
             return False
 
+    def read_skill_folder(self, skill_folder):
+        if not self.is_skill(skill_folder):
+            return False
+        path = join(self.skills_dir, skill_folder)
         if skill_folder not in self.skills:
             self.skills[skill_folder] = {"id": hash(path)}
         git_url = self.git_from_folder(path)
