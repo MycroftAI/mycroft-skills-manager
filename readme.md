@@ -30,6 +30,7 @@ Mycroft Skill Manager, in python!
 
 ## TODO
 
+- check if skill was modified before updating
 - messagebus messages for mycroft-core interaction
 - testing permissions issues in mark1/picroft
 - standalone command line util
