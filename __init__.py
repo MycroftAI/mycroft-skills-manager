@@ -430,6 +430,12 @@ class MycroftSkillsManager(object):
         remove(path)
         return True
 
+    def get_installed_skills(self):
+        skills = []
+        for skill in self.skills:
+            if self.skills[skill].get("installed"):
+                skills.append(skill)
+        return skills
 
 class JarbasSkillsManager(MycroftSkillsManager):
     SKILLS_MODULES = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/"
