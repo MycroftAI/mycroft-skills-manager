@@ -2,7 +2,6 @@
 
 Mycroft Skill Manager, in python!
 
-
 ## install
 
     pip install py_msm
@@ -22,6 +21,18 @@ Mycroft Skill Manager, in python!
     msm.remove_by_name("stephen hawking")
     msm.install_by_name("diagnostics")
     msm.install_defaults()
+
+## TODO
+
+- messagebus messages for mycroft-core interaction
+- testing permissions issues in mark1/picroft
+- standalone command line util
+- mycroft skill with stats about skills repo and installed skills
+- [create readme.md](https://rawgit.com/MycroftAI/mycroft-skills/master/meta_editor.html)
+- parse readme.md
+- skiller.sh functionality
+- submit skill to skills repo
+- documentation
 
 ## Credits
 
