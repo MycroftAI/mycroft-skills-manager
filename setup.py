@@ -2,9 +2,9 @@ from setuptools import setup
 
 setup(
     name='py_msm',
-    version='0.3.2',
+    version='0.3.3',
     packages=['py_msm'],
-    install_requires=['GitPython'],
+    install_requires=['GitPython', 'requests'],
     url='https://github.com/JarbasAl/py_msm',
     license='MIT',
     author='jarbasAI',

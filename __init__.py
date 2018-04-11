@@ -28,7 +28,6 @@ class MycroftSkillsManager(object):
         self.emitter = emitter
         self.skills = {}
         self.default_skills = {}
-        self.installed_skills = []
         self.platform = Configuration.get().get("enclosure", {}).get("platform", "desktop")
         LOG.info("platform: " + self.platform)
         self.prepare_msm()
@@ -92,7 +91,7 @@ class MycroftSkillsManager(object):
         self.get_default_skills_list()
 
         # scan skills folder
-        self.installed_skills = self.scan_skills_folder()
+        self.scan_skills_folder()
 
         # scan skills repo
         self.scan_skills_repo()
@@ -436,12 +435,14 @@ class MycroftSkillsManager(object):
         remove(path)
         return True
 
-    def get_installed_skills(self):
+    @property
+    def installed_skills(self):
         skills = []
         for skill in self.skills:
             if self.skills[skill].get("installed"):
                 skills.append(skill)
         return skills
+
 
 class JarbasSkillsManager(MycroftSkillsManager):
     SKILLS_MODULES = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/"
