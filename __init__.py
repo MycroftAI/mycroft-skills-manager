@@ -13,7 +13,7 @@ from git.cmd import Git
 __author__ = "JarbasAI"
 
 
-class MycroftSkillManager(object):
+class MycroftSkillsManager(object):
     DEFAULT_SKILLS = {}
     SKILLS_MODULES = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/.gitmodules"
     SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/DEFAULT-SKILLS"
@@ -129,23 +129,27 @@ class MycroftSkillManager(object):
 
     def scan_skills_folder(self):
         """ scan installed skills """
+        skills = []
         if exists(self.skills_dir):
             # checking skills dir and getting all skills there
             skill_list = [folder for folder in filter(
                 lambda x: isdir(join(self.skills_dir, x)),
                 listdir(self.skills_dir))]
             for skill_folder in skill_list:
+                skills.append(skill_folder)
                 self._is_skill(skill_folder)
-        return self.skills.keys()
+        return skills
 
     def scan_skills_repo(self):
         """ get skills list from skills repo """
         text = requests.get(self.modules_url).text
         modules = text.split('[submodule "')
+        skills = []
         for module in modules:
             if not module:
                 continue
             name = module.split('"]')[0].strip()
+            skills.append(name)
             url = module.split('url = ')[1].strip()
             skill_folder = url.split("/")[-1]
             skill_path = join(self.skills_dir, skill_folder)
@@ -155,18 +159,19 @@ class MycroftSkillManager(object):
             if skill_folder in self.skills:
                 installed = True
             self.skills[skill_folder] = {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "installed": installed}
+        return skills
 
     def install_defaults(self):
         """ installs the default skills, updates all others """
         for skill in self.default_skills["core"]:
-            self.install_from_name(skill)
+            self.install_by_name(skill)
         for skill in self.default_skills["common"]:
-            self.install_from_name(skill)
+            self.install_by_name(skill)
         for skill in self.default_skills.get(self.platform, []):
-            self.install_from_name(skill)
+            self.install_by_name(skill)
         self.update_skills()
 
-    def install_from_name(self, name):
+    def install_by_name(self, name):
         """ installs the mycroft-skill matching <name> """
         folders = self.skills.keys()
         names = [self.skills[skill]["name"] for skill in folders]
@@ -177,14 +182,14 @@ class MycroftSkillManager(object):
                 if self.skills[s]["name"] == n_skill:
                     skill = self.skills[s]
                     if not self.skills[s]["installed"]:
-                        return self.install_from_url[skill["repo"]]
+                        return self.install_by_url[skill["repo"]]
         elif f_score > 0.5:
             skill = self.skills[f_skill]
             if not self.skills[s]["installed"]:
-                return self.install_from_url[skill["repo"]]
+                return self.install_by_url[skill["repo"]]
         return False
 
-    def remove_from_url(self, url):
+    def remove_by_url(self, url):
         """ removes the specified github repo """
         for skill in self.skills:
             if url == self.skills[skill]["repo"]:
@@ -194,7 +199,7 @@ class MycroftSkillManager(object):
                 break
         return False
 
-    def remove_from_name(self, name):
+    def remove_by_name(self, name):
         """ removes the specified skill folder name """
         folders = self.skills.keys()
         names = [self.skills[skill]["name"] for skill in folders]
@@ -219,20 +224,29 @@ class MycroftSkillManager(object):
 
     def list_skills(self):
         """ list all mycroft-skills in the skills repo and installed """
+        # scan skills folder
+        self.scan_skills_folder()
+        # scan skills repo
+        self.scan_skills_repo()
         return self.skills
 
     def update_skills(self):
         """ update all installed skills """
         for skill in self.skills:
             if self.skills[skill]["installed"]:
-                self.install_from_url(self.skills[skill]["repo"])
+                self.install_by_url(self.skills[skill]["repo"])
 
     def url_info(self, url):
         """ shows information about the skill in the specified repo """
         for skill in self.skills:
             if url == self.skills[skill]["repo"]:
                 return self.skills[skill]
-        return {}
+        skill_folder = name = url.split("/")[-1]
+        skill_path = join(self.skills_dir, skill_folder)
+        skill_id = hash(skill_path)
+        skill_author = url.split("/")[-2]
+        installed = False
+        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "installed": installed}
 
     def name_info(self, name):
         """ shows information about the skill matching <name> """
@@ -248,7 +262,7 @@ class MycroftSkillManager(object):
             return self.skills[f_skill]
         return {}
 
-    def install_from_url(self, url):
+    def install_by_url(self, url):
         """ installs from the specified github repo """
         skill_folder = url.split("/")[-1]
         path = join(self.skills_dir, skill_folder)
