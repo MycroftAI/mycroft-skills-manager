@@ -16,6 +16,7 @@ Mycroft Skill Manager, in python!
     
     print msm.platform
     print msm.default_skills
+    print msm.installed_skills
     print msm.list_skills()
     print msm.url_info("https://github.com/JarbasAl/skill-stephen-hawking")
     print msm.name_info("date time")
@@ -23,6 +24,9 @@ Mycroft Skill Manager, in python!
     msm.remove_by_name("stephen hawking")
     msm.install_by_name("diagnostics")
     msm.install_defaults()
+    msm.remove_from_priority_list("skill-pairing")
+    msm.add_to_blacklist("skill-pairing")
+    msm.reload_skill("skill-pairing")
 
 ## TODO
 
