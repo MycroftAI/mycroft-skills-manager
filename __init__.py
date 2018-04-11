@@ -1,10 +1,14 @@
 from mycroft.configuration.config import Configuration
 from mycroft.skills.core import MainModule
 from mycroft.util.parse import match_one
-from os.path import exists, expanduser, join, dirname, isdir
+from os.path import exists, expanduser, join, isdir
 from os import makedirs, listdir, remove
 import requests
 import subprocess
+import pip
+from git import Repo
+from git.cmd import Git
+
 
 __author__ = "JarbasAI"
 
@@ -14,7 +18,7 @@ class MycroftSkillManager(object):
     SKILLS_MODULES = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/.gitmodules"
     SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/DEFAULT-SKILLS"
 
-    def __init__(self, emitter, skills_config=None, defaults_url=None, modules_url=None):
+    def __init__(self, emitter=None, skills_config=None, defaults_url=None, modules_url=None):
         self.skills_config = skills_config or Configuration.get().get("skills", {})
         self.skills_dir = self.skills_config.get("directory") or '/opt/mycroft/skills'
         self.modules_url = modules_url or self.SKILLS_MODULES
@@ -119,7 +123,9 @@ class MycroftSkillManager(object):
         # scan skills repo
         self.scan_skills_repo()
 
-        # TODO permissions stuff
+        if self.platform in ["picroft", "mycroft_mark_1"]:
+            pass
+            # TODO permissions stuff
 
     def scan_skills_folder(self):
         """ scan installed skills """
@@ -188,7 +194,7 @@ class MycroftSkillManager(object):
                 break
         return False
 
-    def remove_from_name(self, folder_name):
+    def remove_from_name(self, name):
         """ removes the specified skill folder name """
         folders = self.skills.keys()
         names = [self.skills[skill]["name"] for skill in folders]
@@ -234,7 +240,6 @@ class MycroftSkillManager(object):
         names = [self.skills[skill]["name"] for skill in folders]
         f_skill, f_score = match_one(name, folders)
         n_skill, n_score = match_one(name, names)
-        installed = False
         if n_score > 0.5:
             for s in self.skills:
                 if self.skills[s]["name"] == n_skill:
@@ -243,13 +248,44 @@ class MycroftSkillManager(object):
             return self.skills[f_skill]
         return {}
 
-    # TODOS
     def install_from_url(self, url):
         """ installs from the specified github repo """
-        return False
+        skill_folder = url.split("/")[-1]
+        path = join(self.skills_dir, skill_folder)
+        if exists(path):
+            g = Git(path)
+            g.pull()
+        else:
+            Repo.clone_from(url, path)
+        if skill_folder not in self.skills:
+            self.skills[skill_folder] = {"folder": skill_folder, "path": path,
+                                         "id": hash(path), "repo": url,
+                                         "name": skill_folder, "installed": True,
+                                         "author": url.split("/")[-2]}
+        self.run_requirements_sh(skill_folder)
+        self.run_pip(skill_folder)
 
     def run_pip(self, skill_folder):
+        skill = self.skills[skill_folder]
+        # no need for sudo if in venv
+        # TODO handle sudo if not in venv
+        if exists(join(skill["path"], "requirements.txt")):
+            pip_code = pip.main(['install', '-r', join(skill["path"], "requirements.txt")])
+            # TODO parse pip code
+            return True
         return False
 
     def run_requirements_sh(self, skill_folder):
+        skill = self.skills[skill_folder]
+        reqs = join(skill["path"], "requirements.sh")
+        if exists(reqs):
+            # make exec
+            subprocess.call((["chmod", "+x", reqs]))
+            # handle sudo
+            if self.platform == "desktop":
+                # gksudo
+                output = subprocess.check_output(["gksudo", "bash", reqs])
+            else:  # no sudo
+                output = subprocess.check_output(["bash", reqs])
+            return True
         return False
