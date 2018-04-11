@@ -1,4 +1,4 @@
-from mycroft.configuration.config import Configuration
+from mycroft.configuration.config import Configuration, LocalConf, USER_CONFIG
 from mycroft.skills.core import MainModule
 from mycroft.util.parse import match_one
 from mycroft.util.log import LOG
@@ -31,41 +31,6 @@ class MycroftSkillsManager(object):
         self.platform = Configuration.get().get("enclosure", {}).get("platform", "desktop")
         LOG.info("platform: " + self.platform)
         self.prepare_msm()
-
-    def git_from_folder(self, path):
-        try:
-            website = subprocess.check_output(["git", "remote", "-v"], cwd=path)
-            website = website.replace("origin\t", "").replace(" (fetch)", "").split("\n")[0]
-        except:
-            website = None
-        return website
-
-    def _is_skill(self, skill_folder):
-        """
-            Check if folder is a skill and perform mapping.
-        """
-        LOG.info("checking if " + skill_folder + " is a skill")
-        path = join(self.skills_dir, skill_folder)
-        # check if folder is a skill (must have __init__.py)
-        if not MainModule + ".py" in listdir(path):
-            LOG.warning("not a skill!")
-            return False
-
-        if skill_folder not in self.skills:
-            self.skills[skill_folder] = {"id": hash(path)}
-        git_url = self.git_from_folder(path)
-        if git_url:
-            author = git_url.split("/")[-2]
-        else:
-            author = "unknown"
-        self.skills[skill_folder]["path"] = path
-        self.skills[skill_folder]["folder"] = skill_folder
-        if "name" not in self.skills[skill_folder].keys():
-            self.skills[skill_folder]["name"] = skill_folder
-        self.skills[skill_folder]["repo"] = git_url
-        self.skills[skill_folder]["author"] = author
-        self.skills[skill_folder]["installed"] = True
-        return True
 
     def get_default_skills_list(self):
         """ get default skills list from url """
@@ -173,6 +138,33 @@ class MycroftSkillsManager(object):
         LOG.info("scanned: " + str(skills))
         return skills
 
+    def _is_skill(self, skill_folder):
+        """
+            Check if folder is a skill and perform mapping.
+        """
+        LOG.info("checking if " + skill_folder + " is a skill")
+        path = join(self.skills_dir, skill_folder)
+        # check if folder is a skill (must have __init__.py)
+        if not MainModule + ".py" in listdir(path):
+            LOG.warning("not a skill!")
+            return False
+
+        if skill_folder not in self.skills:
+            self.skills[skill_folder] = {"id": hash(path)}
+        git_url = self.git_from_folder(path)
+        if git_url:
+            author = git_url.split("/")[-2]
+        else:
+            author = "unknown"
+        self.skills[skill_folder]["path"] = path
+        self.skills[skill_folder]["folder"] = skill_folder
+        if "name" not in self.skills[skill_folder].keys():
+            self.skills[skill_folder]["name"] = skill_folder
+        self.skills[skill_folder]["repo"] = git_url
+        self.skills[skill_folder]["author"] = author
+        self.skills[skill_folder]["installed"] = True
+        return True
+
     def install_defaults(self):
         """ installs the default skills, updates all others """
         for skill in self.default_skills["core"]:
@@ -186,123 +178,9 @@ class MycroftSkillsManager(object):
             self.install_by_name(skill)
         self.update_skills()
 
-    def install_by_name(self, name):
-        """ installs the mycroft-skill matching <name> """
-        LOG.info("searching skill by name: " + name)
-        folders = self.skills.keys()
-        names = [self.skills[skill]["name"] for skill in folders]
-        f_skill, f_score = match_one(name, folders)
-        n_skill, n_score = match_one(name, names)
-        if n_score > 0.5:
-            for s in self.skills:
-                if self.skills[s]["name"] == n_skill:
-                    skill = self.skills[s]
-                    LOG.info("found skill by name")
-                    if not skill["installed"]:
-                        LOG.info("skill is not installed")
-                        return self.install_by_url(skill["repo"])
-        elif f_score > 0.5:
-            skill = self.skills[f_skill]
-            LOG.info("found skill by folder name")
-            if not skill["installed"]:
-                LOG.info("skill is not installed")
-                return self.install_by_url(skill["repo"])
-        return False
-
-    def remove_by_url(self, url):
-        """ removes the specified github repo """
-        LOG.info("searching skill by github url: " + url)
-        for skill in self.skills:
-            if url == self.skills[skill]["repo"]:
-                LOG.info("found skill!")
-                if self.skills[skill]["installed"]:
-                    remove(self.skills[skill]["path"])
-                    return True
-                break
-        LOG.warning("skill not found!")
-        return False
-
-    def remove_by_name(self, name):
-        """ removes the specified skill folder name """
-        LOG.info("searching skill by name: " + name)
-        folders = self.skills.keys()
-        names = [self.skills[skill]["name"] for skill in folders]
-        f_skill, f_score = match_one(name, folders)
-        n_skill, n_score = match_one(name, names)
-        installed = False
-        if n_score > 0.5:
-            for s in self.skills:
-                if self.skills[s]["name"] == n_skill:
-                    LOG.info("found skill by name")
-                    skill = self.skills[s]
-                    installed = skill["installed"]
-                    self.skills[s]["installed"] = False
-                    break
-        elif f_score > 0.5:
-            LOG.info("found skill by folder name")
-            skill = self.skills[f_skill]
-            installed = skill["installed"]
-            self.skills[f_skill]["installed"] = False
-        if not installed:
-            LOG.warning("skill is not installed!")
-            return False
-        remove(skill["path"])
-        LOG.info("skill removed")
-        return True
-
-    def list_skills(self):
-        """ list all mycroft-skills in the skills repo and installed """
-        # scan skills folder
-        self.scan_skills_folder()
-        # scan skills repo
-        self.scan_skills_repo()
-        return self.skills
-
-    def update_skills(self):
-        """ update all installed skills """
-        LOG.info("updating installed skills")
-        for skill in self.skills:
-            if self.skills[skill]["installed"]:
-                LOG.info("updating " + skill)
-                self.install_by_url(self.skills[skill]["repo"])
-
-    def url_info(self, url):
-        """ shows information about the skill in the specified repo """
-        LOG.info("searching skill by github url: " + url)
-        for skill in self.skills:
-            if url == self.skills[skill]["repo"]:
-                LOG.info("found skill!")
-                return self.skills[skill]
-        self.url_check(url)
-        skill_folder = name = url.split("/")[-1]
-        skill_path = join(self.skills_dir, skill_folder)
-        skill_id = hash(skill_path)
-        skill_author = url.split("/")[-2]
-        installed = False
-        LOG.info("skill not found!")
-        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "installed": installed}
-
-    def name_info(self, name):
-        """ shows information about the skill matching <name> """
-        LOG.info("searching skill by name: " + name)
-        folders = self.skills.keys()
-        names = [self.skills[skill]["name"] for skill in folders]
-        f_skill, f_score = match_one(name, folders)
-        n_skill, n_score = match_one(name, names)
-        if n_score > 0.5:
-            for s in self.skills:
-                if self.skills[s]["name"] == n_skill:
-                    LOG.info("skill found by name!")
-                    return self.skills[s]
-        elif f_score > 0.5:
-            LOG.info("skill found by folder name!")
-            return self.skills[f_skill]
-        LOG.warning("skill not found")
-        return {}
-
     def install_by_url(self, url):
         """ installs from the specified github repo """
-        self.url_check(url)
+        self.github_url_check(url)
         skill_folder = url.split("/")[-1]
         path = join(self.skills_dir, skill_folder)
         if exists(path):
@@ -319,6 +197,81 @@ class MycroftSkillsManager(object):
                                          "author": url.split("/")[-2]}
         self.run_requirements_sh(skill_folder)
         self.run_pip(skill_folder)
+
+    def install_by_name(self, name):
+        """ installs the mycroft-skill matching <name> """
+        LOG.info("searching skill by name: " + name)
+        skill_folder = self.match_name_to_folder(name)
+        if skill_folder is not None:
+            skill = self.skills[skill_folder]
+            return self.install_by_url(skill["repo"])
+        return False
+
+    def update_skills(self):
+        """ update all installed skills """
+        LOG.info("updating installed skills")
+        for skill in self.skills:
+            if self.skills[skill]["installed"]:
+                LOG.info("updating " + skill)
+                self.install_by_url(self.skills[skill]["repo"])
+
+    def remove_by_url(self, url):
+        """ removes the specified github repo """
+        LOG.info("searching skill by github url: " + url)
+        for skill in self.skills:
+            if url == self.skills[skill]["repo"]:
+                LOG.info("found skill!")
+                if self.skills[skill]["installed"]:
+                    remove(self.skills[skill]["path"])
+                    return True
+                break
+        LOG.warning("skill not found!")
+        return False
+
+    def remove_by_name(self, name):
+        """ removes the specified skill folder name """
+        skill_folder = self.match_name_to_folder(name)
+        installed = self.skills[skill_folder]["installed"]
+        self.skills[skill_folder]["installed"] = False
+        if not installed:
+            LOG.warning("skill is not installed!")
+            return False
+        remove(self.skills[skill_folder]["path"])
+        LOG.info("skill removed")
+        return True
+
+    def list_skills(self):
+        """ list all mycroft-skills in the skills repo and installed """
+        # scan skills folder
+        self.scan_skills_folder()
+        # scan skills repo
+        self.scan_skills_repo()
+        return self.skills
+
+    def url_info(self, url):
+        """ shows information about the skill in the specified repo """
+        LOG.info("searching skill by github url: " + url)
+        for skill in self.skills:
+            if url == self.skills[skill]["repo"]:
+                LOG.info("found skill!")
+                return self.skills[skill]
+        self.github_url_check(url)
+        skill_folder = name = url.split("/")[-1]
+        skill_path = join(self.skills_dir, skill_folder)
+        skill_id = hash(skill_path)
+        skill_author = url.split("/")[-2]
+        installed = False
+        LOG.info("skill not found!")
+        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "installed": installed}
+
+    def name_info(self, name):
+        """ shows information about the skill matching <name> """
+        LOG.info("searching skill by name: " + name)
+        skill = self.match_name_to_folder(name)
+        if skill is not None:
+            return self.skills[skill]
+        LOG.warning("skill not found")
+        return {}
 
     def run_pip(self, skill_folder):
         LOG.info("running pip for: " + skill_folder)
@@ -347,10 +300,122 @@ class MycroftSkillsManager(object):
             return True
         return False
 
+    def match_name_to_folder(self, name):
+        LOG.info("searching skill by name: " + name)
+        folders = self.skills.keys()
+        names = [self.skills[skill]["name"] for skill in folders]
+        f_skill, f_score = match_one(name, folders)
+        n_skill, n_score = match_one(name, names)
+        if n_score > 0.5:
+            for s in self.skills:
+                if self.skills[s]["name"] == n_skill:
+                    LOG.info("found skill by name")
+                    return s
+        elif f_score > 0.5:
+            LOG.info("found skill by folder name")
+            return f_skill
+        return None
+
     @staticmethod
-    def url_check(url=""):
+    def git_from_folder(path):
+        try:
+            website = subprocess.check_output(["git", "remote", "-v"], cwd=path)
+            website = website.replace("origin\t", "").replace(" (fetch)", "").split("\n")[0]
+        except:
+            website = None
+        return website
+
+    @staticmethod
+    def github_url_check(url=""):
         if not url.startswith("https://github.com"):
             raise AttributeError("this url does not seem to be form github: " + url)
+
+    # handling skills config
+
+    def remove_from_priority_list(self, skill_name, save=True):
+        skill_folder = self.match_name_to_folder(skill_name)
+        if skill_folder is None:
+            LOG.error("could not find skill to remove from priority list")
+            return False
+
+        if "priority_skills" not in self.skills_config:
+            self.skills_config["priority_skills"] = []
+        if skill_folder in self.skills_config["priority_skills"]:
+            if not self.skills[skill_folder]["installed"]:
+                LOG.debug("removing skill from priority list, but it is not installed")
+            self.skills_config["priority_skills"].remove(skill_folder)
+            LOG.info("Skill removed  from priority list: " + skill_folder)
+            if save:
+                self.update_skills_config()
+        else:
+            LOG.info("Skill is not in priority list: " + skill_folder)
+        return True
+
+    def add_to_priority_list(self, skill_name, save=True):
+        skill_folder = self.match_name_to_folder(skill_name)
+        if skill_folder is None:
+            LOG.error("could not find skill to add to priority list")
+            return False
+        if not self.skills[skill_folder]["installed"]:
+            LOG.debug("Adding skill to priority list, but it is not installed")
+        if "priority_skills" not in self.skills_config:
+            self.skills_config["priority_skills"] = []
+        if skill_folder not in self.skills_config["priority_skills"]:
+            self.skills_config["priority_skills"].append(skill_folder)
+            LOG.info("Skill added to priority list: " + skill_folder)
+            if save:
+                self.update_skills_config()
+        else:
+            LOG.info("Skill already in priority list: " + skill_folder)
+        return True
+
+    def remove_from_blacklist(self, skill_name, save=True):
+        skill_folder = self.match_name_to_folder(skill_name)
+        if skill_folder is None:
+            LOG.error("could not find skill to unblacklist")
+            return False
+
+        if "blacklisted_skills" not in self.skills_config:
+            self.skills_config["blacklisted_skills"] = []
+        if skill_folder in self.skills_config["blacklisted_skills"]:
+            if not self.skills[skill_folder]["installed"]:
+                LOG.debug("UnBlacklisting skill, but it is not installed")
+            self.skills_config["blacklisted_skills"].remove(skill_folder)
+            LOG.info("Skill UnBlacklisted: " + skill_folder)
+            if save:
+                self.update_skills_config()
+        else:
+            LOG.info("Skill is not in blacklist: " + skill_folder)
+        return True
+
+    def add_to_blacklist(self, skill_name, save=True):
+        skill_folder = self.match_name_to_folder(skill_name)
+        if skill_folder is None:
+            LOG.error("could not find skill to blacklist")
+            return False
+        if not self.skills[skill_folder]["installed"]:
+            LOG.debug("Blacklisting skill, but it is not installed")
+        if "blacklisted_skills" not in self.skills_config:
+            self.skills_config["blacklisted_skills"] = []
+        if skill_folder not in self.skills_config["blacklisted_skills"]:
+            self.skills_config["blacklisted_skills"].append(skill_folder)
+            LOG.info("Skill Blacklisted: " + skill_folder)
+            if save:
+                self.update_skills_config()
+        else:
+            LOG.info("Skill already Blacklisted: " + skill_folder)
+        return True
+
+    def change_skills_directory(self, skills_dir, save=True):
+        self.skills_config["directory"] = skills_dir
+        self.skills_dir = skills_dir
+        if save:
+            self.update_skills_config()
+
+    def update_skills_config(self, config=None):
+        conf = LocalConf(USER_CONFIG)
+        conf['skills'] = config or self.skills_config
+        conf.store()
 
 
 class JarbasSkillsManager(MycroftSkillsManager):
