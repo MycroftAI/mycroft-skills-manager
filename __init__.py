@@ -27,12 +27,20 @@ class MycroftSkillsManager(object):
         self.defaults_url = defaults_url or self.SKILLS_DEFAULTS_URL
         self.emitter = emitter
         self.skills = {}
-        self.default_skills = {}
         self.platform = Configuration.get().get("enclosure", {}).get("platform", "desktop")
         LOG.info("platform: " + self.platform)
         self.prepare_msm()
 
-    def get_default_skills_list(self):
+    @property
+    def installed_skills(self):
+        skills = []
+        for skill in self.skills:
+            if self.skills[skill].get("installed"):
+                skills.append(skill)
+        return skills
+
+    @property
+    def default_skills(self):
         """ get default skills list from url """
         LOG.info("retrieving default skills list")
         defaults = {}
@@ -72,9 +80,8 @@ class MycroftSkillsManager(object):
             mk1 = []
         defaults["mycroft_mark_1"] = mk1
         # on error use hard coded defaults
-        self.default_skills = defaults or self.DEFAULT_SKILLS
         LOG.info("default skills: " + str(defaults))
-        return self.default_skills
+        return defaults or self.DEFAULT_SKILLS
 
     def prepare_msm(self):
         """ prepare msm execution """
@@ -88,7 +95,7 @@ class MycroftSkillsManager(object):
             makedirs(self.skills_dir)
 
         # update default skills list
-        self.get_default_skills_list()
+        defaults = self.default_skills
 
         # scan skills folder
         self.scan_skills_folder()
@@ -435,14 +442,6 @@ class MycroftSkillsManager(object):
         remove(path)
         return True
 
-    @property
-    def installed_skills(self):
-        skills = []
-        for skill in self.skills:
-            if self.skills[skill].get("installed"):
-                skills.append(skill)
-        return skills
-
 
 class JarbasSkillsManager(MycroftSkillsManager):
     SKILLS_MODULES = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/"
@@ -460,12 +459,13 @@ class JarbasSkillsManager(MycroftSkillsManager):
         LOG.info("scanning Mycroft skills repo")
         return self.msm.scan_skills_repo()
 
-    def get_default_skills_list(self):
+    @property
+    def default_skills(self):
         """ get default skills list from url """
-        LOG.info("retrieving default skills list")
+        LOG.info("retrieving default jarbas skills list")
         defaults = {}
         try:
-            # get core and common skillw
+            # get core and common skills
             text = requests.get(self.defaults_url).text
             core = text.split("# core")[1]
             core, common = core.split("# common")
@@ -508,9 +508,8 @@ class JarbasSkillsManager(MycroftSkillsManager):
             jarbas = []
         defaults["jarbas"] = jarbas
         # on error use hard coded defaults
-        self.default_skills = defaults or self.DEFAULT_SKILLS
         LOG.info("default jarbas skills: " + str(defaults))
-        return self.default_skills
+        return defaults or self.DEFAULT_SKILLS
 
     def scan_skills_repo(self):
         """ get skills list from skills repo """
