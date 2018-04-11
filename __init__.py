@@ -129,6 +129,8 @@ class MycroftSkillsManager(object):
             skills.append(name)
             url = module.split('url = ')[1].strip()
             skill_folder = url.split("/")[-1]
+            if skill_folder[-4:] == '.git':
+                skill_folder = skill_folder[:-4]
             skill_path = join(self.skills_dir, skill_folder)
             skill_id = hash(skill_path)
             skill_author = url.split("/")[-2]
