@@ -273,6 +273,7 @@ class MycroftSkillsManager(object):
             if url == self.skills[skill]["repo"]:
                 LOG.info("found skill!")
                 return self.skills[skill]
+        self.url_check(url)
         skill_folder = name = url.split("/")[-1]
         skill_path = join(self.skills_dir, skill_folder)
         skill_id = hash(skill_path)
@@ -301,6 +302,7 @@ class MycroftSkillsManager(object):
 
     def install_by_url(self, url):
         """ installs from the specified github repo """
+        self.url_check(url)
         skill_folder = url.split("/")[-1]
         path = join(self.skills_dir, skill_folder)
         if exists(path):
@@ -344,4 +346,106 @@ class MycroftSkillsManager(object):
                 output = subprocess.check_output(["bash", reqs])
             return True
         return False
+
+    @staticmethod
+    def url_check(url=""):
+        if not url.startswith("https://github.com"):
+            raise AttributeError("this url does not seem to be form github: " + url)
+
+
+class JarbasSkillsManager(MycroftSkillsManager):
+    SKILLS_MODULES = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/"
+    SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/DEFAULT_SKILLS"
+
+    def __init__(self, emitter=None, skills_config=None, defaults_url=None, modules_url=None):
+        self.msm = MycroftSkillsManager(emitter, skills_config)
+        defaults_url = defaults_url or self.SKILLS_DEFAULTS_URL
+        modules_url = modules_url or self.SKILLS_MODULES
+        super(JarbasSkillsManager, self).__init__(emitter, skills_config, defaults_url, modules_url)
+
+    @property
+    def mycroft_repo_skills(self):
+        """ get skills list from mycroft skills repo """
+        LOG.info("scanning Mycroft skills repo")
+        return self.msm.scan_skills_repo()
+
+    def get_default_skills_list(self):
+        """ get default skills list from url """
+        LOG.info("retrieving default skills list")
+        defaults = {}
+        try:
+            # get core and common skillw
+            text = requests.get(self.defaults_url).text
+            core = text.split("# core")[1]
+            core, common = core.split("# common")
+            core = [c for c in core.split("\n") if c]
+            common = [c for c in common.split("\n") if c]
+        except:
+            core = common = []
+        defaults["core"] = core
+        defaults["common"] = common
+        # get picroft
+        try:
+            text = requests.get(self.defaults_url + ".picroft").text
+            picroft = text.split("# picroft")[1]
+            picroft = [c for c in picroft.split("\n") if c]
+        except:
+            picroft = []
+        defaults["picroft"] = picroft
+        # get kde
+        try:
+            text = requests.get(self.defaults_url + ".kde").text
+            kde = text.split("# desktop")[1]
+            kde = [c for c in kde.split("\n") if c]
+        except:
+            kde = []
+        defaults["desktop"] = kde
+        # get mark 1
+        try:
+            text = requests.get(self.defaults_url + ".mycroft_mark_1").text
+            mk1 = text.split("# mark 1")[1]
+            mk1 = [c for c in mk1.split("\n") if c]
+        except:
+            mk1 = []
+        defaults["mycroft_mark_1"] = mk1
+        # get jarbas
+        try:
+            text = requests.get(self.defaults_url + ".jarbas").text
+            jarbas = text.split("# jarbas")[1]
+            jarbas = [c for c in jarbas.split("\n") if c]
+        except:
+            jarbas = []
+        defaults["jarbas"] = jarbas
+        # on error use hard coded defaults
+        self.default_skills = defaults or self.DEFAULT_SKILLS
+        LOG.info("default jarbas skills: " + str(defaults))
+        return self.default_skills
+
+    def scan_skills_repo(self):
+        """ get skills list from skills repo """
+        LOG.info("scanning Jarbas skills repo")
+        platforms = ["core", "common", "kde", "jarbas", "desktop", "picroft",  "mycroft_mark_1"]
+        scanned = []
+        for platform in platforms:
+            text = requests.get(self.modules_url+platform+".txt").text
+            skills = text.splitlines()
+            for s in skills:
+                name, url = s.split(",")
+                if not url:
+                    url = self.msm.name_info(name).get("repo")
+                    if not url:
+                        continue
+                scanned.append(name)
+                skill_folder = url.split("/")[-1]
+                skill_path = join(self.skills_dir, skill_folder)
+                skill_id = hash(skill_path)
+                skill_author = url.split("/")[-2]
+                installed = False
+                if skill_folder in self.installed_skills:
+                    installed = True
+                self.skills[skill_folder] = {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id,
+                                             "author": skill_author, "name": name, "installed": installed}
+
+            LOG.info("scanned " + platform + ": " + str(skills))
+        return scanned
 
