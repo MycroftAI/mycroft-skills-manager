@@ -27,6 +27,8 @@ Mycroft Skill Manager, in python!
     msm.remove_from_priority_list("skill-pairing")
     msm.add_to_blacklist("skill-pairing")
     msm.reload_skill("skill-pairing")
+    
+can also be used with [jarbas-skills-repo](https://github.com/JarbasAl/jarbas_skills_repo)
 
 ## TODO
 
