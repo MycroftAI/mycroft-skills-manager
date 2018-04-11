@@ -21,6 +21,7 @@ Mycroft Skill Manager, in python!
     msm.update_skills()
     msm.remove_by_name("stephen hawking")
     msm.install_by_name("diagnostics")
+    msm.install_defaults()
 
 ## Credits
 
