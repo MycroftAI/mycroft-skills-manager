@@ -9,6 +9,7 @@ import subprocess
 import pip
 from git import Repo
 from git.cmd import Git
+from time import sleep
 
 
 __author__ = "JarbasAI"
@@ -416,6 +417,18 @@ class MycroftSkillsManager(object):
         conf = LocalConf(USER_CONFIG)
         conf['skills'] = config or self.skills_config
         conf.store()
+
+    def reload_skill(self, skill_name):
+        skill_folder = self.match_name_to_folder(skill_name)
+        if skill_folder is None:
+            LOG.error("Could not find skill to reload: " + skill_name)
+            return False
+        path = self.skills[skill_folder]["path"]+"/reloading"
+        with open(path, "w") as f:
+            f.write(" ")
+        sleep(2)
+        remove(path)
+        return True
 
 
 class JarbasSkillsManager(MycroftSkillsManager):
