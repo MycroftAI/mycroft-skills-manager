@@ -27,9 +27,12 @@ Mycroft Skill Manager, in python!
     msm.remove_from_priority_list("skill-pairing")
     msm.add_to_blacklist("skill-pairing")
     msm.reload_skill("skill-pairing")
+    
+can also be used with [jarbas-skills-repo](https://github.com/JarbasAl/jarbas_skills_repo)
 
 ## TODO
 
+- check if skill was modified before updating
 - messagebus messages for mycroft-core interaction
 - testing permissions issues in mark1/picroft
 - standalone command line util
