@@ -4,13 +4,12 @@ from mycroft.util.parse import match_one
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from os.path import exists, expanduser, join, isdir
-from os import makedirs, listdir, remove
+from os import makedirs, listdir, remove, utime
 import requests
 import subprocess
 import pip
 from git import Repo
 from git.cmd import Git
-from time import sleep
 
 
 __author__ = "JarbasAI"
@@ -417,29 +416,37 @@ class MycroftSkillsManager(object):
     def remove_from_priority_list(self, skill_name):
         skill_folder = self.match_name_to_folder(skill_name)
         if skill_folder is None:
-            LOG.error("could not find skill to remove from priority list")
-            return False
+            LOG.warning("could not find skill to remove from priority list")
+            data = {"folder": skill_name}
+            skill_folder = skill_name
+        else:
+            data = self.skills[skill_folder]
+            if not data["installed"]:
+                LOG.debug("removing skill from priority list, but it is not installed")
+
         config = self.skills_config
         if "priority_skills" not in config:
             config["priority_skills"] = []
         if skill_folder in config["priority_skills"]:
-            if not self.skills[skill_folder]["installed"]:
-                LOG.debug("removing skill from priority list, but it is not installed")
             config["priority_skills"].remove(skill_folder)
             LOG.info("Skill removed  from priority list: " + skill_folder)
             self.update_skills_config(config)
-            self.send_message("skill.deprioritized")
+            self.send_message("skill.deprioritized", data)
         else:
             LOG.info("Skill is not in priority list: " + skill_folder)
+            return False
         return True
 
     def add_to_priority_list(self, skill_name):
         skill_folder = self.match_name_to_folder(skill_name)
         if skill_folder is None:
-            LOG.error("could not find skill to add to priority list")
-            return False
-        if not self.skills[skill_folder]["installed"]:
-            LOG.debug("Adding skill to priority list, but it is not installed")
+            LOG.warning("could not find skill to add to priority list")
+            data = {"folder": skill_name}
+            skill_folder = skill_name
+        else:
+            data = self.skills[skill_folder]
+            if not data["installed"]:
+                LOG.debug("Adding skill to priority list, but it is not installed")
 
         config = self.skills_config
         if "priority_skills" not in config:
@@ -448,7 +455,7 @@ class MycroftSkillsManager(object):
             config["priority_skills"].append(skill_folder)
             LOG.info("Skill added to priority list: " + skill_folder)
             self.update_skills_config(config)
-            self.send_message("skill.prioritized")
+            self.send_message("skill.prioritized", data)
         else:
             LOG.info("Skill already in priority list: " + skill_folder)
         return True
@@ -456,31 +463,38 @@ class MycroftSkillsManager(object):
     def remove_from_blacklist(self, skill_name):
         skill_folder = self.match_name_to_folder(skill_name)
         if skill_folder is None:
-            LOG.error("could not find skill to unblacklist")
-            return False
+            LOG.warning("could not find skill to unblacklist")
+            data = {"folder": skill_name}
+            skill_folder = skill_name
+        else:
+            data = self.skills[skill_folder]
+            if not data["installed"]:
+                LOG.debug("Whitelisting skill, but it is not installed")
 
         config = self.skills_config
         if "blacklisted_skills" not in config:
             config["blacklisted_skills"] = []
+
         if skill_folder in config["blacklisted_skills"]:
-            if not self.skills[skill_folder]["installed"]:
-                LOG.debug("UnBlacklisting skill, but it is not installed")
             config["blacklisted_skills"].remove(skill_folder)
             LOG.info("Skill UnBlacklisted: " + skill_folder)
             self.update_skills_config(config)
-            self.send_message("skill.whitelisted")
+            self.send_message("skill.whitelisted", data)
         else:
             LOG.info("Skill is not in blacklist: " + skill_folder)
+            return False
         return True
 
     def add_to_blacklist(self, skill_name):
         skill_folder = self.match_name_to_folder(skill_name)
         if skill_folder is None:
-            LOG.error("could not find skill to blacklist")
-            return False
-
-        if not self.skills[skill_folder]["installed"]:
-            LOG.debug("Blacklisting skill, but it is not installed")
+            LOG.warning("could not find skill to blacklist")
+            data = {"folder": skill_name}
+            skill_folder = skill_name
+        else:
+            data = self.skills[skill_folder]
+            if not data["installed"]:
+                LOG.debug("Blacklisting skill, but it is not installed")
 
         config = self.skills_config
         if "blacklisted_skills" not in config:
@@ -489,7 +503,7 @@ class MycroftSkillsManager(object):
         if skill_folder not in config["blacklisted_skills"]:
             config["blacklisted_skills"].append(skill_folder)
             LOG.info("Skill Blacklisted: " + skill_folder)
-            self.send_message("skill.blacklisted", self.skills[skill_folder])
+            self.send_message("skill.blacklisted", data)
             self.update_skills_config(config)
         else:
             LOG.info("Skill already Blacklisted: " + skill_folder)
@@ -517,12 +531,9 @@ class MycroftSkillsManager(object):
             LOG.error("Could not find skill to reload: " + skill_name)
             self.send_message("skill.reload.failed", {"name": skill_folder, "error": "skill not found"})
             return False
-        path = self.skills[skill_folder]["path"]+"/reloading.tmp"
-        with open(path, "w") as f:
-            f.write(" ")
-        sleep(2)
-        remove(path)
-        self.send_message("skill.reloaded", self.skills[skill_folder])
+        path = self.skills[skill_folder]["path"]
+        touch(path)
+        self.send_message("skill.reloading", self.skills[skill_folder])
         return True
 
 
@@ -622,3 +633,9 @@ class JarbasSkillsManager(MycroftSkillsManager):
             LOG.info("scanned " + platform + ": " + str(skills))
         return scanned
 
+
+def touch(fname):
+    try:
+        utime(fname, None)
+    except OSError:
+        open(fname, 'a').close()
