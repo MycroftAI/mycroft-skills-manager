@@ -162,6 +162,7 @@ class MycroftSkillsManager(object):
             skills.append(name)
             url = module.split('url = ')[1].strip()
             skill_data = self.url_info(url)
+            skill_data["name"] = name
             self.skills[skill_data["folder"]] = skill_data
         LOG.info("scanned: " + str(skills))
         return skills
