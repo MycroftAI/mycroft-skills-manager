@@ -9,7 +9,7 @@ import requests
 import subprocess
 import pip
 from git import Repo
-from git.cmd import Git
+from git.cmd import Git, GitCommandError
 
 
 __author__ = "JarbasAI"
@@ -233,6 +233,11 @@ class MycroftSkillsManager(object):
             self.run_pip(skill_folder)
             self.skills[skill_folder]["downloaded"] = True
             self.send_message("msm.install.succeeded", data)
+        except GitCommandError:
+            LOG.error("skill modified by user, not updating")
+            data["error"] = "skill modified by user"
+            self.send_message("msm.install.failed", data)
+
         except Exception as e:
             data["error"] = e
             self.send_message("msm.install.failed", data)
@@ -384,10 +389,13 @@ class MycroftSkillsManager(object):
                 output = subprocess.check_output(["gksudo", "bash", reqs])
             else:  # no sudo
                 output = subprocess.check_output(["bash", reqs])
-            if str(output) != "0":
-                LOG.error(str(output))
-                return False
-            LOG.debug(output)
+            if output:
+                if str(output) != "0":
+                    LOG.error(str(output))
+                    return False
+                LOG.debug(output)
+            else:
+                LOG.info("no output from requirements.sh, assuming success")
         else:
             LOG.info("no requirements.sh to run")
         return True
