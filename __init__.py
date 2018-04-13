@@ -409,8 +409,6 @@ class MycroftSkillsManager(object):
         # TODO check hash before re running
         if exists(join(skill["path"], "requirements.txt")):
             pip_code = pip.main(['install', '-r', join(skill["path"], "requirements.txt")])
-            # TODO parse pip code
-
             if str(pip_code) == "1":
                 LOG.error("pip code: " + str(pip_code))
                 raise PipRequirementsException
