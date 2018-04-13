@@ -7,6 +7,7 @@ from os.path import exists, expanduser, join, isdir
 from os import makedirs, listdir, remove, utime
 import requests
 import subprocess
+from subprocess import Popen, PIPE
 import pip
 from git import Repo
 from git.cmd import Git, GitCommandError
@@ -15,8 +16,31 @@ from git.cmd import Git, GitCommandError
 __author__ = "JarbasAI"
 
 
+class SystemRequirementsException(Exception):
+    pass
+
+
+class PipRequirementsException(Exception):
+    pass
+
+
 class MycroftSkillsManager(object):
-    DEFAULT_SKILLS = {}
+    DEFAULT_SKILLS = {'core': [u'mycroft-pairing', u'mycroft-configuration', u'mycroft-installer', u'mycroft-stop',
+                               u'mycroft-naptime', u'mycroft-playback-control', u'mycroft-speak', u'mycroft-volume'],
+                      'mycroft_mark_1': [u'mycroft-mark-1-demo', u'mycroft-mark-1',
+                                         u'mycroft-spotify', u'pandora-skill'],
+                      'picroft': [],
+                      'common': [u'mycroft-fallback-duck-duck-go', u'fallback-aiml',
+                                 u'fallback-wolfram-alpha', u'fallback-unknown', u'mycroft-alarm',
+                                 u'mycroft-audio-record', u'mycroft-date-time', u'mycroft-hello-world',
+                                 u'mycroft-ip', u'mycroft-joke', u'mycroft-npr-news', u'mycroft-personal',
+                                 u'mycroft-reminder', u'mycroft-singing', u'mycroft-spelling', u'mycroft-stock',
+                                 u'mycroft-support-helper', u'mycroft-timer', u'mycroft-weather', u'mycroft-wiki',
+                                 u'mycroft-version-checker'],
+                      'desktop': [u'skill-autogui', u'mycroft-desktop-launcher',
+                                  u'krunner-search-skill', u'plasma-activities-skill', u'plasma-user-control-skill',
+                                  u'plasma-mycroftplasmoid-control']
+                      }
     SKILLS_MODULES = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/.gitmodules"
     SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/DEFAULT-SKILLS"
 
@@ -211,45 +235,65 @@ class MycroftSkillsManager(object):
             self.install_by_name(skill)
         self.update_skills()
 
-    def install_by_url(self, url):
+    def install_by_url(self, url, ignore_errors=False):
         """ installs from the specified github repo """
         self.github_url_check(url)
         data = self.url_info(url)
         skill_folder = data["folder"]
         path = data["path"]
         self.send_message("msm.installing", data)
-        try:
-            if exists(path):
-                LOG.info("skill exists, updating")
-                g = Git(path)
+        if exists(path):
+            LOG.info("skill exists, updating")
+            # TODO get hashes before pulling to decide if pip and res.sh should be run
+            # TODO ensure skill master branch is checked out, else dont update
+            g = Git(path)
+            try:
                 g.pull()
-            else:
-                LOG.info("Downloading skill: " + url)
-                Repo.clone_from(url, path)
-            if skill_folder not in self.skills:
-                self.skills[skill_folder] = data
-            # TODO get error codes from installing requirements
+            except GitCommandError:
+                LOG.error("skill modified by user")
+                if not ignore_errors:
+                    LOG.info("not updating")
+                    data["error"] = "skill modified by user"
+                    self.send_message("msm.install.failed", data)
+                    self.send_message("msm.installed")
+                    return False
+        else:
+            LOG.info("Downloading skill: " + url)
+            Repo.clone_from(url, path)
+
+        if skill_folder not in self.skills:
+            self.skills[skill_folder] = data
+
+        self.skills[skill_folder]["downloaded"] = True
+        try:
             self.run_requirements_sh(skill_folder)
+        except SystemRequirementsException:
+            if not ignore_errors:
+                data["error"] = "could not run requirements.sh"
+                self.send_message("msm.install.failed", data)
+                self.send_message("msm.installed")
+                return False
+
+        try:
             self.run_pip(skill_folder)
-            self.skills[skill_folder]["downloaded"] = True
-            self.send_message("msm.install.succeeded", data)
-        except GitCommandError:
-            LOG.error("skill modified by user, not updating")
-            data["error"] = "skill modified by user"
-            self.send_message("msm.install.failed", data)
+        except PipRequirementsException:
+            if not ignore_errors:
+                data["error"] = "could not run install requirements.txt"
+                self.send_message("msm.install.failed", data)
+                self.send_message("msm.installed")
+                return False
 
-        except Exception as e:
-            data["error"] = e
-            self.send_message("msm.install.failed", data)
+        self.send_message("msm.install.succeeded", data)
         self.send_message("msm.installed")
+        return True
 
-    def install_by_name(self, name):
+    def install_by_name(self, name, ignore_errors=False):
         """ installs the mycroft-skill matching <name> """
         LOG.info("searching skill by name: " + name)
         skill_folder = self.match_name_to_folder(name)
         if skill_folder is not None:
             skill = self.skills[skill_folder]
-            return self.install_by_url(skill["repo"])
+            return self.install_by_url(skill["repo"], ignore_errors)
         data = {"name": name}
         self.send_message("msm.installing", data)
         data["error"] = "skill not found"
@@ -257,15 +301,14 @@ class MycroftSkillsManager(object):
         self.send_message("msm.installed", data)
         return False
 
-    def update_skills(self):
+    def update_skills(self, ignore_errors=True):
         """ update all downloaded skills """
         LOG.info("updating downloaded skills")
         self.send_message("msm.updating")
         for skill in self.skills:
             if self.skills[skill]["downloaded"]:
-                # TODO check if user modified before updating
                 LOG.info("updating " + skill)
-                self.install_by_url(self.skills[skill]["repo"])
+                self.install_by_url(self.skills[skill]["repo"], ignore_errors)
         self.send_message("msm.updated")
 
     def remove_by_url(self, url):
@@ -339,6 +382,8 @@ class MycroftSkillsManager(object):
                 LOG.info("found skill!")
                 return self.skills[skill]
         self.github_url_check(url)
+        if url.endswith("/"):
+            url = url[:-1]
         skill_folder = name = url.split("/")[-1]
         if skill_folder[-4:] == '.git':
             name = skill_folder = skill_folder[:-4]
@@ -369,35 +414,38 @@ class MycroftSkillsManager(object):
 
             if str(pip_code) == "1":
                 LOG.error("pip code: " + str(pip_code))
-                return False
+                raise PipRequirementsException
             LOG.debug("pip code: " + str(pip_code))
+            return False
         else:
             LOG.info("no requirements.txt to run")
         return True
 
     def run_requirements_sh(self, skill_folder):
-        LOG.info("running requirements.sh for: " + skill_folder)
         skill = self.skills[skill_folder]
         reqs = join(skill["path"], "requirements.sh")
         # TODO check hash before re running
         if exists(reqs):
+            LOG.info("running requirements.sh for: " + skill_folder)
             # make exec
             subprocess.call((["chmod", "+x", reqs]))
             # handle sudo
             if self.platform in ["desktop", "kde", "jarbas"]:
                 # gksudo
-                output = subprocess.check_output(["gksudo", "bash", reqs])
+                args = ["gksudo", "bash", reqs]
             else:  # no sudo
-                output = subprocess.check_output(["bash", reqs])
-            if output:
-                if str(output) != "0":
-                    LOG.error(str(output))
-                    return False
-                LOG.debug(output)
-            else:
-                LOG.info("no output from requirements.sh, assuming success")
+                args = ["bash", reqs]
+            p = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output, err = p.communicate()
+            LOG.debug("requirements.sh output: " + str(output))
+            rc = p.returncode
+            if rc != 0:
+                LOG.error("Requirements.sh failed with error code: " + str(rc))
+                raise SystemRequirementsException
+            LOG.info("Successfully ran requirements.sh for " + skill_folder)
         else:
             LOG.info("no requirements.sh to run")
+            return False
         return True
 
     def match_name_to_folder(self, name):
