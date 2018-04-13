@@ -7,7 +7,6 @@ from os.path import exists, expanduser, join, isdir
 from os import makedirs, listdir, remove, utime
 import requests
 import subprocess
-from subprocess import Popen, PIPE
 import pip
 from git import Repo
 from git.cmd import Git, GitCommandError
@@ -435,10 +434,8 @@ class MycroftSkillsManager(object):
                 args = ["gksudo", "bash", reqs]
             else:  # no sudo
                 args = ["bash", reqs]
-            p = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            output, err = p.communicate()
-            LOG.debug("requirements.sh output: " + str(output))
-            rc = p.returncode
+            rc = subprocess.call(args)
+            LOG.debug("Requirements.sh return code:" + str(rc))
             if rc != 0:
                 LOG.error("Requirements.sh failed with error code: " + str(rc))
                 raise SystemRequirementsException
