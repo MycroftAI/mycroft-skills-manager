@@ -62,10 +62,10 @@ class MycroftSkillsManager(object):
         return self._skills_config or Configuration.get().get("skills", {"directory": '/opt/mycroft/skills'})
 
     @property
-    def installed_skills(self):
+    def downloaded_skills(self):
         skills = []
         for skill in self.skills:
-            if self.skills[skill].get("installed"):
+            if self.skills[skill].get("downloaded"):
                 skills.append(skill)
         return skills
 
@@ -134,8 +134,8 @@ class MycroftSkillsManager(object):
             # TODO permissions stuff
 
     def scan_skills_folder(self):
-        """ scan installed skills """
-        LOG.info("scanning installed skills")
+        """ scan downloaded skills """
+        LOG.info("scanning downloaded skills")
         skills = []
         if exists(self.skills_dir):
             # checking skills dir and getting all skills there
@@ -195,7 +195,7 @@ class MycroftSkillsManager(object):
             self.skills[skill_folder]["name"] = skill_folder
         self.skills[skill_folder]["repo"] = git_url
         self.skills[skill_folder]["author"] = author
-        self.skills[skill_folder]["installed"] = True
+        self.skills[skill_folder]["downloaded"] = True
         return True
 
     def install_defaults(self):
@@ -231,7 +231,7 @@ class MycroftSkillsManager(object):
             # TODO get error codes from installing requirements
             self.run_requirements_sh(skill_folder)
             self.run_pip(skill_folder)
-            self.skills[skill_folder]["installed"] = True
+            self.skills[skill_folder]["downloaded"] = True
             self.send_message("msm.install.succeeded", data)
         except Exception as e:
             data["error"] = e
@@ -253,11 +253,11 @@ class MycroftSkillsManager(object):
         return False
 
     def update_skills(self):
-        """ update all installed skills """
-        LOG.info("updating installed skills")
+        """ update all downloaded skills """
+        LOG.info("updating downloaded skills")
         self.send_message("msm.updating")
         for skill in self.skills:
-            if self.skills[skill]["installed"]:
+            if self.skills[skill]["downloaded"]:
                 # TODO check if user modified before updating
                 LOG.info("updating " + skill)
                 self.install_by_url(self.skills[skill]["repo"])
@@ -272,14 +272,14 @@ class MycroftSkillsManager(object):
             for skill in self.skills:
                 if url == self.skills[skill]["repo"]:
                     LOG.info("found skill!")
-                    if self.skills[skill]["installed"]:
+                    if self.skills[skill]["downloaded"]:
                         remove(data["path"])
                         self.send_message("msm.remove.succeeded", data)
                         self.send_message("msm.removed", data)
                         return True
                     else:
-                        LOG.warning("skill not installed!")
-                        data["error"] = "skill not installed"
+                        LOG.warning("skill not downloaded!")
+                        data["error"] = "skill not downloaded"
                         self.send_message("msm.remove.failed", data)
                         self.send_message("msm.removed", data)
         else:
@@ -296,12 +296,12 @@ class MycroftSkillsManager(object):
         if skill_folder:
             data = self.skills[skill_folder]
             self.send_message("msm.removing", data)
-            installed = self.skills[skill_folder]["installed"]
-            self.skills[skill_folder]["installed"] = False
-            if not installed:
-                LOG.warning("skill is not installed!")
+            downloaded = self.skills[skill_folder]["downloaded"]
+            self.skills[skill_folder]["downloaded"] = False
+            if not downloaded:
+                LOG.warning("skill is not downloaded!")
                 # TODO error code
-                data["error"] = "skill not installed"
+                data["error"] = "skill not downloaded"
                 self.send_message("msm.remove.failed", data)
             else:
                 remove(self.skills[skill_folder]["path"])
@@ -319,7 +319,7 @@ class MycroftSkillsManager(object):
         return False
 
     def list_skills(self):
-        """ list all mycroft-skills in the skills repo and installed """
+        """ list all mycroft-skills in the skills repo and downloaded """
         # scan skills folder
         self.scan_skills_folder()
         # scan skills repo
@@ -340,8 +340,8 @@ class MycroftSkillsManager(object):
         skill_path = join(self.skills_dir, skill_folder)
         skill_id = hash(skill_path)
         skill_author = url.split("/")[-2]
-        installed = skill_folder in self.installed_skills
-        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "installed": installed}
+        downloaded = skill_folder in self.downloaded_skills
+        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "downloaded": downloaded}
 
     def name_info(self, name):
         """ shows information about the skill matching <name> """
@@ -432,8 +432,8 @@ class MycroftSkillsManager(object):
             skill_folder = skill_name
         else:
             data = self.skills[skill_folder]
-            if not data["installed"]:
-                LOG.debug("removing skill from priority list, but it is not installed")
+            if not data["downloaded"]:
+                LOG.debug("removing skill from priority list, but it is not downloaded")
 
         config = self.skills_config
         if "priority_skills" not in config:
@@ -456,8 +456,8 @@ class MycroftSkillsManager(object):
             skill_folder = skill_name
         else:
             data = self.skills[skill_folder]
-            if not data["installed"]:
-                LOG.debug("Adding skill to priority list, but it is not installed")
+            if not data["downloaded"]:
+                LOG.debug("Adding skill to priority list, but it is not downloaded")
 
         config = self.skills_config
         if "priority_skills" not in config:
@@ -479,8 +479,8 @@ class MycroftSkillsManager(object):
             skill_folder = skill_name
         else:
             data = self.skills[skill_folder]
-            if not data["installed"]:
-                LOG.debug("Whitelisting skill, but it is not installed")
+            if not data["downloaded"]:
+                LOG.debug("Whitelisting skill, but it is not downloaded")
 
         config = self.skills_config
         if "blacklisted_skills" not in config:
@@ -504,8 +504,8 @@ class MycroftSkillsManager(object):
             skill_folder = skill_name
         else:
             data = self.skills[skill_folder]
-            if not data["installed"]:
-                LOG.debug("Blacklisting skill, but it is not installed")
+            if not data["downloaded"]:
+                LOG.debug("Blacklisting skill, but it is not downloaded")
 
         config = self.skills_config
         if "blacklisted_skills" not in config:
@@ -637,11 +637,11 @@ class JarbasSkillsManager(MycroftSkillsManager):
                 skill_path = join(self.skills_dir, skill_folder)
                 skill_id = hash(skill_path)
                 skill_author = url.split("/")[-2]
-                installed = False
-                if skill_folder in self.installed_skills:
-                    installed = True
+                downloaded = False
+                if skill_folder in self.downloaded_skills:
+                    downloaded = True
                 self.skills[skill_folder] = {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id,
-                                             "author": skill_author, "name": name, "installed": installed}
+                                             "author": skill_author, "name": name, "downloaded": downloaded}
 
             LOG.info("scanned " + platform + ": " + str(skills))
         return scanned
