@@ -282,6 +282,7 @@ class MycroftSkillsManager(object):
                 self.send_message("msm.installed")
                 return False
 
+        self.run_skills_requirements(skill_folder)
         self.send_message("msm.install.succeeded", data)
         self.send_message("msm.installed")
         return True
@@ -444,6 +445,21 @@ class MycroftSkillsManager(object):
             LOG.info("no requirements.sh to run")
             return False
         return True
+
+    def run_skills_requirements(self, skill_folder):
+        skill = self.skills[skill_folder]
+        reqs = join(skill["path"], "skill_requirements.txt")
+        # TODO check hash before re running
+        if exists(reqs):
+            LOG.info("installed required skills for: " + skill_folder)
+            with open(reqs, "r") as f:
+                skills = f.readlines()
+            for s in skills:
+                LOG.info("installing " + s)
+                if s.startswith("http"):
+                    self.install_by_url(s)
+                else:
+                    self.install_by_name(skill["folder"])
 
     def match_name_to_folder(self, name):
         LOG.info("searching skill by name: " + name)
