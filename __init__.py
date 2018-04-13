@@ -361,8 +361,14 @@ class MycroftSkillsManager(object):
         if exists(join(skill["path"], "requirements.txt")):
             pip_code = pip.main(['install', '-r', join(skill["path"], "requirements.txt")])
             # TODO parse pip code
-            return True
-        return False
+
+            if str(pip_code) == "1":
+                LOG.error("pip code: " + str(pip_code))
+                return False
+            LOG.debug("pip code: " + str(pip_code))
+        else:
+            LOG.info("no requirements.txt to run")
+        return True
 
     def run_requirements_sh(self, skill_folder):
         LOG.info("running requirements.sh for: " + skill_folder)
@@ -378,8 +384,13 @@ class MycroftSkillsManager(object):
                 output = subprocess.check_output(["gksudo", "bash", reqs])
             else:  # no sudo
                 output = subprocess.check_output(["bash", reqs])
-            return True
-        return False
+            if str(output) != "0":
+                LOG.error(str(output))
+                return False
+            LOG.debug(output)
+        else:
+            LOG.info("no requirements.sh to run")
+        return True
 
     def match_name_to_folder(self, name):
         LOG.info("searching skill by name: " + name)
@@ -507,6 +518,8 @@ class MycroftSkillsManager(object):
             self.update_skills_config(config)
         else:
             LOG.info("Skill already Blacklisted: " + skill_folder)
+        LOG.info("reloading skill to trigger shutdown")
+        self.reload_skill(skill_folder)
         return True
 
     def change_skills_directory(self, skills_dir):
