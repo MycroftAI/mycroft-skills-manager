@@ -33,7 +33,12 @@ can also be used with [jarbas-skills-repo](https://github.com/JarbasAl/jarbas_sk
 ## TODO
 
 - allow passing mycroft root dir in constructor
-- testing permissions issues in mark1/picroft
+- permissions issues in mark1/picroft - prepare_msm.sh script
+- get hashes before git pulling to decide if pip and res.sh should be run
+- ensure skill master branch is checked out, else dont update
+- use standard msm error codes
+- handle pip sudo if not in venv
+- requirements.sh guide / template
 - standalone command line util
 - mycroft skill with stats about skills repo and installed skills
 - [auto create readme.md](https://rawgit.com/MycroftAI/mycroft-skills/master/meta_editor.html) for skills
