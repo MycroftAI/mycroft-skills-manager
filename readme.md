@@ -32,16 +32,19 @@ can also be used with [jarbas-skills-repo](https://github.com/JarbasAl/jarbas_sk
 
 ## TODO
 
-- check if skill was modified before updating
-- messagebus messages for mycroft-core interaction
+- allow passing mycroft root dir in constructor
 - testing permissions issues in mark1/picroft
 - standalone command line util
 - mycroft skill with stats about skills repo and installed skills
-- [create readme.md](https://rawgit.com/MycroftAI/mycroft-skills/master/meta_editor.html)
-- parse readme.md
+- [auto create readme.md](https://rawgit.com/MycroftAI/mycroft-skills/master/meta_editor.html) for skills
+- parse readme.md from skills
 - skiller.sh functionality
 - submit skill to skills repo
 - documentation
+
+## Extras
+
+- checks for skill_requirements.txt, will install skills listed there
 
 ## troubleshooting
 
