@@ -635,8 +635,7 @@ class JarbasSkillsManager(MycroftSkillsManager):
         LOG.info("scanning Mycroft skills repo")
         return self.msm.scan_skills_repo()
 
-    @property
-    def default_skills(self):
+    def get_default_skills(self):
         """ get default skills list from url """
         LOG.info("retrieving default jarbas skills list")
         defaults = {}
@@ -696,7 +695,11 @@ class JarbasSkillsManager(MycroftSkillsManager):
             text = requests.get(self.modules_url+platform+".txt").text
             skills = text.splitlines()
             for s in skills:
-                name, url = s.split(",")
+                try:
+                    name, url = s.split(",")
+                except Exception as e:
+                    name = s.replace(",","").strip()
+                    url = None
                 if not url:
                     url = self.msm.name_info(name).get("repo")
                     if not url:
