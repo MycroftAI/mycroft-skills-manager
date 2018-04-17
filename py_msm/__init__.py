@@ -236,6 +236,7 @@ class MycroftSkillsManager(object):
 
     def install_by_url(self, url, ignore_errors=False):
         """ installs from the specified github repo """
+        url = url.strip()
         self.github_url_check(url)
         data = self.url_info(url)
         skill_folder = data["folder"]
@@ -712,7 +713,7 @@ class JarbasSkillsManager(MycroftSkillsManager):
                 downloaded = False
                 if skill_folder in self.downloaded_skills:
                     downloaded = True
-                self.skills[skill_folder] = {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id,
+                self.skills[skill_folder] = {"repo": url.strip(), "folder": skill_folder, "path": skill_path, "id": skill_id,
                                              "author": skill_author, "name": name, "downloaded": downloaded}
 
             LOG.info("scanned " + platform + ": " + str(skills))
