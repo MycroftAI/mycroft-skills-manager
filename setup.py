@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='py_msm',
-    version='0.3.8',
+    version='0.3.9',
     packages=['py_msm'],
     install_requires=['GitPython', 'requests', 'pip<=9.0.0'],
     url='https://github.com/JarbasAl/py_msm',

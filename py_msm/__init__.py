@@ -7,7 +7,6 @@ from os.path import exists, expanduser, join, isdir
 from os import makedirs, listdir, remove, utime
 import requests
 import subprocess
-import pip
 from git import Repo
 from git.cmd import Git, GitCommandError
 
@@ -221,18 +220,18 @@ class MycroftSkillsManager(object):
         self.skills[skill_folder]["downloaded"] = True
         return True
 
-    def install_defaults(self):
+    def install_defaults(self, ignore_errors=True):
         """ installs the default skills, updates all others """
         for skill in self.default_skills["core"]:
             LOG.info("installing core skills")
-            self.install_by_name(skill)
+            self.install_by_name(skill, ignore_errors=ignore_errors)
         for skill in self.default_skills["common"]:
             LOG.info("installing common skills")
-            self.install_by_name(skill)
+            self.install_by_name(skill, ignore_errors=ignore_errors)
         for skill in self.default_skills.get(self.platform, []):
             LOG.info("installing platform specific skills")
-            self.install_by_name(skill)
-        self.update_skills()
+            self.install_by_name(skill, ignore_errors=ignore_errors)
+        self.update_skills(ignore_errors=ignore_errors)
 
     def install_by_url(self, url, ignore_errors=False):
         """ installs from the specified github repo """
@@ -410,6 +409,7 @@ class MycroftSkillsManager(object):
         # TODO handle sudo if not in venv
         # TODO check hash before re running
         if exists(join(skill["path"], "requirements.txt")):
+            import pip # must be here or pip throws error code 2 on threads
             pip_code = pip.main(['install', '-r', join(skill["path"], "requirements.txt")])
             # TODO parse pip code
 
@@ -433,7 +433,7 @@ class MycroftSkillsManager(object):
             # handle sudo
             if self.platform in ["desktop", "kde", "jarbas"]:
                 # gksudo
-                args = ["gksudo", "bash", reqs]
+                args = ["gksu", "bash", reqs]
             else:  # no sudo
                 args = ["bash", reqs]
             rc = subprocess.call(args)
@@ -706,7 +706,7 @@ class JarbasSkillsManager(MycroftSkillsManager):
                     if not url:
                         continue
                 scanned.append(name)
-                skill_folder = url.split("/")[-1]
+                skill_folder = url.split("/")[-1].replace(".git", "")
                 skill_path = join(self.skills_dir, skill_folder)
                 skill_id = hash(skill_path)
                 skill_author = url.split("/")[-2]
@@ -725,3 +725,50 @@ def touch(fname):
         utime(fname, None)
     except OSError:
         open(fname, 'a').close()
+
+
+if __name__ == "__main__":
+    from mycroft.messagebus.client.ws import WebsocketClient
+    from threading import Thread
+    import argparse
+    from time import sleep
+    from sys import exit
+
+    ws = WebsocketClient()
+
+    def connect():
+        ws.run_forever()
+
+    ws_thread = Thread(target=connect)
+    ws_thread.setDaemon(True)
+    ws_thread.start()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("option", help="action to take, defaults to install default skills, list to list available skills, install {url_or_name} to install a skill")
+    parser.add_argument("skill", help="skill to install", action="store_true")
+    args = parser.parse_args()
+    option = args.option
+
+    while not ws.started_running:
+        print "waiting for websocket connection..."
+        sleep(2)
+
+    msm = JarbasSkillsManager(emitter=ws)
+
+    if option in ["-d", "--defaults", "defaults"]:
+        msm.install_defaults()
+        exit(0)
+    elif option in ["-l", "--list", "list"]:
+        msm.list_skills()
+        exit(0)
+    elif option in ["-i", "install"]:
+        if args.skill:
+            if args.skill.startswith("http"):
+                msm.install_by_url(args.skill)
+            else:
+                msm.install_by_name(args.skill)
+            exit(0)
+        print "bad skill name"
+        exit(666)
+    ws_thread.join(0)
+    exit(5373)
