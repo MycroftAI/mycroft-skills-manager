@@ -98,11 +98,15 @@ class SkillEntry(object):
         weights = [
             (9, self._compare(name, search)),
             (9, self._compare(name.split(' '), search_tokens)),
-            (2, self._compare(name_common, search_common))
+            (2, self._compare(name_common, search_common)),
         ]
         if author:
-            weights.append((5, self._compare(self.author, author)))
-        return (
+            author_weight = self._compare(self.author, author)
+            weights.append((5, author_weight))
+            author_weight = author_weight
+        else:
+            author_weight = 1.0
+        return author_weight * (
                 sum(weight * val for weight, val in weights) /
                 sum(weight for weight, val in weights)
         )
