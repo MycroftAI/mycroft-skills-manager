@@ -9,5 +9,10 @@ setup(
     license='MIT',
     author='jarbasAI',
     author_email='jarbasai@mailfence.com',
-    description='Mycroft Skill Manager, in python!'
+    description='Mycroft Skill Manager, in python!',
+    entry_points={
+        'console_scripts': {
+            'msm=py_msm.__init__:main'
+        }
+    }
 )

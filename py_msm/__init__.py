@@ -1,774 +1,466 @@
-from mycroft.configuration.config import Configuration, LocalConf, USER_CONFIG
-from mycroft.skills.core import MainModule
-from mycroft.util.parse import match_one
-from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
-from os.path import exists, expanduser, join, isdir
-from os import makedirs, listdir, remove, utime
-import requests
-import subprocess
-from git import Repo
-from git.cmd import Git, GitCommandError
+from __future__ import print_function
 
+import logging
+import subprocess
+from difflib import SequenceMatcher
+from glob import glob
+from itertools import chain
+from logging import ERROR, DEBUG
+from os import makedirs
+from shutil import rmtree
+
+from git import Repo
+from git.cmd import Git
+from git.exc import GitCommandError
+from os.path import exists, expanduser, join, isdir, dirname, basename
+from typing import Dict, List
+
+from py_msm.exceptions import PipRequirementsException, \
+    SystemRequirementsException, AlreadyInstalled, SkillModified, \
+    AlreadyRemoved, RemoveException, MsmException, InstallException, \
+    SkillNotFound, MultipleSkillMatches, CloneException
 
 __author__ = "JarbasAI"
+MainModule = '__init__'
+
+logging.basicConfig(level=DEBUG, format='%(levelname)s - %(message)s')
+LOG = logging.getLogger(__name__)
 
 
-class SystemRequirementsException(Exception):
-    pass
+class SkillEntry(object):
+    def __init__(self, path, name=None, author=None, url=None):
+        self.path = path
+        self.name = name or basename(path)
+        self.author = author
+        self.url = url
+        self.repo = SkillEntry.extract_repo(url)
+        self.is_local = exists(path)
 
+    @classmethod
+    def from_folder(cls, path, repo_to_name):
+        url = cls.find_git_url(path).rstrip('/')
 
-class PipRequirementsException(Exception):
-    pass
+        author = cls._extract_author(url) if url else None
+        repo = cls.extract_repo(url) if url else None
+        name = repo_to_name.get(repo, basename(path))
+        return cls(path, name, author, url)
 
+    @classmethod
+    def from_url(cls, url, skill_dir, repo_to_name):
+        """ shows information about the skill in the specified repo """
+        url = url.rstrip('/')
 
-class MycroftSkillsManager(object):
-    DEFAULT_SKILLS = {'core': [u'mycroft-pairing', u'mycroft-configuration', u'mycroft-installer', u'mycroft-stop',
-                               u'mycroft-naptime', u'mycroft-playback-control', u'mycroft-speak', u'mycroft-volume'],
-                      'mycroft_mark_1': [u'mycroft-mark-1-demo', u'mycroft-mark-1',
-                                         u'mycroft-spotify', u'pandora-skill'],
-                      'picroft': [],
-                      'common': [u'mycroft-fallback-duck-duck-go', u'fallback-aiml',
-                                 u'fallback-wolfram-alpha', u'fallback-unknown', u'mycroft-alarm',
-                                 u'mycroft-audio-record', u'mycroft-date-time', u'mycroft-hello-world',
-                                 u'mycroft-ip', u'mycroft-joke', u'mycroft-npr-news', u'mycroft-personal',
-                                 u'mycroft-reminder', u'mycroft-singing', u'mycroft-spelling', u'mycroft-stock',
-                                 u'mycroft-support-helper', u'mycroft-timer', u'mycroft-weather', u'mycroft-wiki',
-                                 u'mycroft-version-checker'],
-                      'desktop': [u'skill-autogui', u'mycroft-desktop-launcher',
-                                  u'krunner-search-skill', u'plasma-activities-skill', u'plasma-user-control-skill',
-                                  u'plasma-mycroftplasmoid-control']
-                      }
-    SKILLS_MODULES = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/.gitmodules"
-    SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills/master/DEFAULT-SKILLS"
+        author = cls._extract_author(url)
+        repo = cls.extract_repo(url)
 
-    def __init__(self, emitter=None, skills_config=None, defaults_url=None, modules_url=None):
-        self._skills_config = skills_config
-        self.modules_url = modules_url or self.SKILLS_MODULES
-        self.defaults_url = defaults_url or self.SKILLS_DEFAULTS_URL
-        self.skills = {}
-        self.default_skills = {}
-        LOG.info("platform: " + self.platform)
-        self.prepare_msm()
-        self.bind(emitter)
+        path = join(skill_dir, '{}.{}'.format(
+            cls._extract_folder(url), author
+        ))
 
-    def bind(self, emitter):
-        self.emitter = emitter
+        name = repo_to_name.get(repo, basename(path))
+        return cls(path, name, author, url)
 
-    def send_message(self, m_type, m_data=None, m_context=None):
-        m_data = m_data or {}
-        m_context = m_context or {"source": "py_msm"}
-        if self.emitter is not None:
-            self.emitter.emit(Message(m_type, m_data, m_context))
-        else:
-            LOG.warning("no messagebus emitter provided, message not sent")
-            message = {"type": m_type, "data": m_data, "context": m_context}
-            print message["type"], message["data"]
+    @staticmethod
+    def _extract_folder(url):
+        s = url.split("/")[-1]
+        a, b, c = s.rpartition('.git')
+        if not c:
+            return a
+        return s
 
-    @property
-    def platform(self):
-        return Configuration.get().get("enclosure", {}).get("platform", "desktop")
+    @staticmethod
+    def _extract_author(url):
+        return url.split("/")[-2].split(':')[-1]
 
-    @property
-    def skills_dir(self):
-        skills_dir = self.skills_config.get("directory", '/opt/mycroft/skills')
+    @classmethod
+    def extract_repo(cls, url):
+        return '{}:{}'.format(cls._extract_author(url),
+                              cls._extract_folder(url))
 
-        # find home dir
-        if "~" in skills_dir:
-            skills_dir = expanduser(skills_dir)
+    @staticmethod
+    def _tokenize(x):
+        return x.replace('-', ' ').split()
 
-        return skills_dir
+    @staticmethod
+    def _extract_tokens(s, tokens):
+        s = s.lower().replace('-', '')
+        extracted = []
+        for token in tokens:
+            extracted += [token] * s.count(token)
+            s = s.replace(token, '')
+        s = ' '.join(i for i in s.split(' ') if i)
+        tokens = [i for i in s.split(' ') if i]
+        return s, tokens, extracted
 
-    @property
-    def skills_config(self):
-        return self._skills_config or Configuration.get().get("skills", {"directory": '/opt/mycroft/skills'})
+    @classmethod
+    def _compare(cls, a, b):
+        return SequenceMatcher(a=a, b=b).ratio()
 
-    @property
-    def downloaded_skills(self):
-        skills = []
-        for skill in self.skills:
-            if self.skills[skill].get("downloaded"):
-                skills.append(skill)
-        return skills
+    def match(self, query, author=None):
+        search, search_tokens, search_common = self._extract_tokens(
+            query.lower(), ['skill', 'fallback', 'mycroft']
+        )
 
-    def get_default_skills(self):
-        """ get default skills list from url """
-        LOG.info("retrieving default skills list")
-        defaults = {}
+        name, name_tokens, name_common = self._extract_tokens(
+            self.name.lower(), ['skill', 'fallback', 'mycroft']
+        )
+
+        weights = [
+            (9, self._compare(name, search)),
+            (9, self._compare(name.split(' '), search_tokens)),
+            (2, self._compare(name_common, search_common))
+        ]
+        if author:
+            weights.append((5, self._compare(self.author, author)))
+        return (
+                sum(weight * val for weight, val in weights) /
+                sum(weight for weight, val in weights)
+        )
+
+    def run_pip(self):
+        # no need for sudo if in venv
+        # TODO handle sudo if not in venv
+        # TODO check hash before re running
+        requirements_file = join(self.path, "requirements.txt")
+        if not exists(requirements_file):
+            return False
+
+        import pip  # must be here or pip throws error code 2 on threads
+        LOG.info('Installing requirements.txt')
+        pip_code = pip.main(['install', '-r', requirements_file])
+        # TODO parse pip code
+
+        if pip_code != 0:
+            LOG.error("pip code: " + str(pip_code))
+            raise PipRequirementsException(pip_code)
+
+        return True
+
+    def run_requirements_sh(self):
+        setup_script = join(self.path, "requirements.sh")
+        # TODO check hash before re running
+        if not exists(setup_script):
+            return False
+
+        subprocess.call(["chmod", "+x", setup_script])
+        rc = subprocess.call(["bash", setup_script])
+        if rc != 0:
+            LOG.error("Requirements.sh failed with error code: " + str(rc))
+            raise SystemRequirementsException(rc)
+        LOG.info("Successfully ran requirements.sh for " + self.name)
+        return True
+
+    def get_dependent_skills(self):
+        reqs = join(self.path, "skill_requirements.txt")
+        if not exists(reqs):
+            return []
+
+        with open(reqs, "r") as f:
+            return [i.strip() for i in f.readlines() if i.strip()]
+
+    def install(self):
+        """ installs or updates skill by url """
+        if self.is_local:
+            raise AlreadyInstalled(self.name)
+
+        LOG.info("Downloading skill: " + self.url)
         try:
-            # get core and common skillw
-            text = requests.get(self.defaults_url).text
-            core = text.split("# core")[1]
-            core, common = core.split("# common")
-            core = [c for c in core.split("\n") if c]
-            common = [c for c in common.split("\n") if c]
-        except:
-            core = common = []
-        defaults["core"] = core
-        defaults["common"] = common
-        # get picroft
+            Repo.clone_from(self.url, self.path)
+        except GitCommandError as e:
+            raise CloneException(str(e))
+
+        self.run_requirements_sh()
+        self.run_pip()
+        LOG.info('Successfully installed ' + self.name)
+        self.is_local = True
+
+    def update(self):
+        # TODO compare hashes to decide if pip and res.sh should be run
+        # TODO ensure skill master branch is checked out, else dont update
         try:
-            text = requests.get(self.defaults_url + ".picroft").text
-            picroft = text.split("# picroft")[1]
-            picroft = [c for c in picroft.split("\n") if c]
-        except:
-            picroft = []
-        defaults["picroft"] = picroft
-        # get kde
+            Git(self.path).pull(ff_only=True)
+        except GitCommandError as e:
+            raise SkillModified(e.stderr)
+
+        self.run_requirements_sh()
+        self.run_pip()
+        LOG.info('Updated ' + self.name)
+
+    def remove(self):
+        if not self.is_local:
+            raise AlreadyRemoved(self.name)
         try:
-            text = requests.get(self.defaults_url+".kde").text
-            kde = text.split("# desktop")[1]
-            kde = [c for c in kde.split("\n") if c]
-        except:
-            kde = []
-        defaults["desktop"] = kde
-        # get mark 1
+            rmtree(self.path)
+        except OSError as e:
+            raise RemoveException(str(e))
+
+        LOG.info('Successfully removed ' + self.name)
+        self.is_local = False
+
+    @staticmethod
+    def find_git_url(path):
+        """ get the git url from a folder"""
         try:
-            text = requests.get(self.defaults_url+".mycroft_mark_1").text
-            mk1 = text.split("# mark 1")[1]
-            mk1 = [c for c in mk1.split("\n") if c]
-        except:
-            mk1 = []
-        defaults["mycroft_mark_1"] = mk1
-        # on error use hard coded defaults
-        LOG.info("default skills: " + str(defaults))
-        return defaults or self.DEFAULT_SKILLS
+            return Git(path).config('remote.origin.url')
+        except GitCommandError:
+            return None
 
-    def prepare_msm(self):
-        """ prepare msm execution """
+    def __repr__(self):
+        return '<SkillEntry {}>'.format(' '.join(
+            '{}={}'.format(attr, self.__dict__[attr])
+            for attr in ['name', 'author', 'is_local']
+        ))
 
-        # create skills dir if missing
-        if not exists(self.skills_dir):
-            LOG.info("creating skills dir")
-            makedirs(self.skills_dir)
 
-        # update default skills list
-        self.default_skills = self.get_default_skills()
+class SkillRepo(object):
+    def __init__(self, path=None, url=None, branch=None):
+        self.path = path or "/opt/mycroft/.skills-repo"
+        self.url = url or "https://github.com/MycroftAI/mycroft-skills"
+        self.branch = branch or "18.02"
 
-        # scan skills folder
-        self.scan_skills_folder()
+    def read_file(self, filename):
+        with open(join(self.path, filename)) as f:
+            return f.read()
 
-        # scan skills repo
-        self.scan_skills_repo()
+    def update(self):
+        if not exists(dirname(self.path)):
+            makedirs(dirname(self.path))
 
-        if self.platform in ["picroft", "mycroft_mark_1"]:
-            pass
-            # TODO permissions stuff
+        if not isdir(self.path):
+            Repo.clone_from(self.url, self.path)
 
-    def scan_skills_folder(self):
-        """ scan downloaded skills """
-        LOG.info("scanning downloaded skills")
-        skills = []
-        if exists(self.skills_dir):
-            # checking skills dir and getting all skills there
-            skill_list = [folder for folder in filter(
-                lambda x: isdir(join(self.skills_dir, x)),
-                listdir(self.skills_dir))]
-            for skill_folder in skill_list:
-                skills.append(skill_folder)
-                self.read_skill_folder(skill_folder)
-        LOG.info("scanned: " + str(skills))
-        return skills
+        git = Git(self.path)
+        git.config('remote.origin.url', self.url)
+        git.fetch()
+        try:
+            git.reset('origin/' + self.branch, hard=True)
+        except GitCommandError as e:
+            raise MsmException('Invalid branch: ' + self.branch)
 
-    def scan_skills_repo(self):
-        """ get skills list from skills repo """
-        LOG.info("scanning skills repo")
-        text = requests.get(self.modules_url).text
-        modules = text.split('[submodule "')
-        skills = []
+    def get_submodules(self):
+        """ generates tuples of skill_name, skill_url """
+        modules = self.read_file('.gitmodules').split('[submodule "')
         for module in modules:
             if not module:
                 continue
             name = module.split('"]')[0].strip()
-            skills.append(name)
             url = module.split('url = ')[1].strip()
-            skill_data = self.url_info(url)
-            skill_data["name"] = name
-            self.skills[skill_data["folder"]] = skill_data
-        LOG.info("scanned: " + str(skills))
-        return skills
+            yield name, url
 
-    def is_skill(self, skill_folder):
-        """
-            Check if folder is a skill and perform mapping.
-        """
-        LOG.info("checking if " + skill_folder + " is a skill")
-        path = join(self.skills_dir, skill_folder)
-        # check if folder is a skill (must have __init__.py)
-        if not MainModule + ".py" in listdir(path):
-            LOG.warning("not a skill!")
-            return False
-        return True
+    def get_default_skill_names(self):
+        for defaults_file in glob(join(self.path, 'DEFAULT-SKILLS*')):
+            with open(defaults_file) as f:
+                skills = filter(
+                    lambda x: x and not x.startswith('#'),
+                    map(str.strip, f.read().split('\n'))
+                )
+            platform = basename(defaults_file).replace('DEFAULT-SKILLS', '')
+            platform = platform.replace('.', '') or 'default'
+            yield platform, skills
 
-    def read_skill_folder(self, skill_folder):
-        if not self.is_skill(skill_folder):
-            return False
-        path = join(self.skills_dir, skill_folder)
-        if skill_folder not in self.skills:
-            self.skills[skill_folder] = {"id": hash(path)}
-        git_url = self.git_from_folder(path)
-        if git_url:
-            author = git_url.split("/")[-2]
-        else:
-            author = "unknown"
-        self.skills[skill_folder]["path"] = path
-        self.skills[skill_folder]["folder"] = skill_folder
-        if "name" not in self.skills[skill_folder].keys():
-            self.skills[skill_folder]["name"] = skill_folder
-        self.skills[skill_folder]["repo"] = git_url
-        self.skills[skill_folder]["author"] = author
-        self.skills[skill_folder]["downloaded"] = True
-        return True
 
-    def install_defaults(self, ignore_errors=True):
-        """ installs the default skills, updates all others """
-        for skill in self.default_skills["core"]:
-            LOG.info("installing core skills")
-            self.install_by_name(skill, ignore_errors=ignore_errors)
-        for skill in self.default_skills["common"]:
-            LOG.info("installing common skills")
-            self.install_by_name(skill, ignore_errors=ignore_errors)
-        for skill in self.default_skills.get(self.platform, []):
-            LOG.info("installing platform specific skills")
-            self.install_by_name(skill, ignore_errors=ignore_errors)
-        self.update_skills(ignore_errors=ignore_errors)
+class MycroftSkillsManager(object):
+    SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde'}
+    DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
 
-    def install_by_url(self, url, ignore_errors=False):
-        """ installs from the specified github repo """
-        url = url.strip()
-        self.github_url_check(url)
-        data = self.url_info(url)
-        skill_folder = data["folder"]
-        path = data["path"]
-        self.send_message("msm.installing", data)
-        if exists(path):
-            LOG.info("skill exists, updating")
-            # TODO get hashes before pulling to decide if pip and res.sh should be run
-            # TODO ensure skill master branch is checked out, else dont update
-            g = Git(path)
-            try:
-                g.pull()
-            except GitCommandError:
-                LOG.error("skill modified by user")
-                if not ignore_errors:
-                    LOG.info("not updating")
-                    data["error"] = "skill modified by user"
-                    self.send_message("msm.install.failed", data)
-                    self.send_message("msm.installed")
-                    return False
-        else:
-            LOG.info("Downloading skill: " + url)
-            Repo.clone_from(url, path)
+    def __init__(self, platform='default', skills_dir=None, repo=None):
+        self.platform = platform
+        self.skills_dir = expanduser(skills_dir or '') \
+                          or self.DEFAULT_SKILLS_DIR
+        self.repo = repo or SkillRepo()
 
-        if skill_folder not in self.skills:
-            self.skills[skill_folder] = data
+    def install(self, param, author=None):
+        """ install by url or name """
+        skill = self.find_skill(param, author)
+        skill.install()
+        for skill_dep in skill.get_dependent_skills():
+            LOG.info("Installing skill dependency: {}".format(skill_dep))
+            self.install(skill_dep)
 
-        self.skills[skill_folder]["downloaded"] = True
-        try:
-            self.run_requirements_sh(skill_folder)
-        except SystemRequirementsException:
-            if not ignore_errors:
-                data["error"] = "could not run requirements.sh"
-                self.send_message("msm.install.failed", data)
-                self.send_message("msm.installed")
-                return False
+    def remove(self, param, author=None):
+        """ remove by url or name"""
+        self.find_skill(param, author).remove()
 
-        try:
-            self.run_pip(skill_folder)
-        except PipRequirementsException:
-            if not ignore_errors:
-                data["error"] = "could not run install requirements.txt"
-                self.send_message("msm.install.failed", data)
-                self.send_message("msm.installed")
-                return False
-
-        self.run_skills_requirements(skill_folder)
-        self.send_message("msm.install.succeeded", data)
-        self.send_message("msm.installed")
-        return True
-
-    def install_by_name(self, name, ignore_errors=False):
-        """ installs the mycroft-skill matching <name> """
-        LOG.info("searching skill by name: " + name)
-        skill_folder = self.match_name_to_folder(name)
-        if skill_folder is not None:
-            skill = self.skills[skill_folder]
-            return self.install_by_url(skill["repo"], ignore_errors)
-        data = {"name": name}
-        self.send_message("msm.installing", data)
-        data["error"] = "skill not found"
-        self.send_message("msm.install.failed", data)
-        self.send_message("msm.installed", data)
-        return False
-
-    def update_skills(self, ignore_errors=True):
+    def update(self):
         """ update all downloaded skills """
-        LOG.info("updating downloaded skills")
-        self.send_message("msm.updating")
-        for skill in self.skills:
-            if self.skills[skill]["downloaded"]:
-                LOG.info("updating " + skill)
-                self.install_by_url(self.skills[skill]["repo"], ignore_errors)
-        self.send_message("msm.updated")
+        errored = False
+        for skill in self.load_local_skill_data():
+            try:
+                skill.update()
+            except MsmException as e:
+                LOG.error('Error updating {}: {}'.format(skill, repr(e)))
+                errored = True
+        return not errored
 
-    def remove_by_url(self, url):
-        """ removes the specified github repo """
-        LOG.info("searching skill by github url: " + url)
-        data = self.url_info(url)
-        self.send_message("msm.removing", data)
-        if data["folder"] in self.skills:
-            for skill in self.skills:
-                if url == self.skills[skill]["repo"]:
-                    LOG.info("found skill!")
-                    if self.skills[skill]["downloaded"]:
-                        remove(data["path"])
-                        self.send_message("msm.remove.succeeded", data)
-                        self.send_message("msm.removed", data)
-                        return True
-                    else:
-                        LOG.warning("skill not downloaded!")
-                        data["error"] = "skill not downloaded"
-                        self.send_message("msm.remove.failed", data)
-                        self.send_message("msm.removed", data)
-        else:
-            LOG.warning("skill not found!")
-            data["error"] = "skill not found"
-            self.send_message("msm.remove.failed", data)
-        self.send_message("msm.removed", data)
-        return False
-
-    def remove_by_name(self, name):
-        """ removes the specified skill folder name """
-        skill_folder = self.match_name_to_folder(name)
-
-        if skill_folder:
-            data = self.skills[skill_folder]
-            self.send_message("msm.removing", data)
-            downloaded = self.skills[skill_folder]["downloaded"]
-            self.skills[skill_folder]["downloaded"] = False
-            if not downloaded:
-                LOG.warning("skill is not downloaded!")
-                # TODO error code
-                data["error"] = "skill not downloaded"
-                self.send_message("msm.remove.failed", data)
-            else:
-                remove(self.skills[skill_folder]["path"])
-                LOG.info("skill removed")
-                self.send_message("msm.remove.succeeded", self.skills[skill_folder])
-            self.send_message("msm.removed", self.skills[skill_folder])
-            return True
-        else:
-            data = {"name": name}
-            self.send_message("msm.removing", data)
-
-        data["error"] = "skill not found"
-        self.send_message("msm.remove.failed", data)
-        self.send_message("msm.removed", data)
-        return False
-
-    def list_skills(self):
-        """ list all mycroft-skills in the skills repo and downloaded """
-        # scan skills folder
-        self.scan_skills_folder()
-        # scan skills repo
-        self.scan_skills_repo()
-        return self.skills
-
-    def url_info(self, url):
-        """ shows information about the skill in the specified repo """
-        LOG.info("getting skill info from github url: " + url)
-        for skill in self.skills:
-            if url == self.skills[skill]["repo"]:
-                LOG.info("found skill!")
-                return self.skills[skill]
-        self.github_url_check(url)
-        if url.endswith("/"):
-            url = url[:-1]
-        skill_folder = name = url.split("/")[-1]
-        if skill_folder[-4:] == '.git':
-            name = skill_folder = skill_folder[:-4]
-        skill_path = join(self.skills_dir, skill_folder)
-        skill_id = hash(skill_path)
-        skill_author = url.split("/")[-2]
-        downloaded = skill_folder in self.downloaded_skills
-        return {"repo": url, "folder": skill_folder, "path": skill_path, "id": skill_id, "author": skill_author, "name": name, "downloaded": downloaded}
-
-    def name_info(self, name):
-        """ shows information about the skill matching <name> """
-        LOG.info("searching skill by name: " + name)
-        skill = self.match_name_to_folder(name)
-        if skill is not None:
-            return self.skills[skill]
-        LOG.warning("skill not found")
-        return {}
-
-    def run_pip(self, skill_folder):
-        LOG.info("running pip for: " + skill_folder)
-        skill = self.skills[skill_folder]
-        # no need for sudo if in venv
-        # TODO handle sudo if not in venv
-        # TODO check hash before re running
-        if exists(join(skill["path"], "requirements.txt")):
-            import pip # must be here or pip throws error code 2 on threads
-            pip_code = pip.main(['install', '-r', join(skill["path"], "requirements.txt")])
-            # TODO parse pip code
-
-            if str(pip_code) == "1":
-                LOG.error("pip code: " + str(pip_code))
-                raise PipRequirementsException
-            LOG.debug("pip code: " + str(pip_code))
-            return False
-        else:
-            LOG.info("no requirements.txt to run")
-        return True
-
-    def run_requirements_sh(self, skill_folder):
-        skill = self.skills[skill_folder]
-        reqs = join(skill["path"], "requirements.sh")
-        # TODO check hash before re running
-        if exists(reqs):
-            LOG.info("running requirements.sh for: " + skill_folder)
-            # make exec
-            subprocess.call((["chmod", "+x", reqs]))
-            # handle sudo
-            if self.platform in ["desktop", "kde", "jarbas"]:
-                # gksudo
-                args = ["gksu", "bash", reqs]
-            else:  # no sudo
-                args = ["bash", reqs]
-            rc = subprocess.call(args)
-            LOG.debug("Requirements.sh return code:" + str(rc))
-            if rc != 0:
-                LOG.error("Requirements.sh failed with error code: " + str(rc))
-                raise SystemRequirementsException
-            LOG.info("Successfully ran requirements.sh for " + skill_folder)
-        else:
-            LOG.info("no requirements.sh to run")
-            return False
-        return True
-
-    def run_skills_requirements(self, skill_folder):
-        skill = self.skills[skill_folder]
-        reqs = join(skill["path"], "skill_requirements.txt")
-        # TODO check hash before re running
-        if exists(reqs):
-            LOG.info("installed required skills for: " + skill_folder)
-            with open(reqs, "r") as f:
-                skills = f.readlines()
-            for s in skills:
-                LOG.info("installing " + s)
-                if s.startswith("http"):
-                    self.install_by_url(s)
-                else:
-                    self.install_by_name(skill["folder"])
-
-    def match_name_to_folder(self, name):
-        LOG.info("searching skill by name: " + name)
-        folders = self.skills.keys()
-        names = [self.skills[skill]["name"] for skill in folders]
-        f_skill, f_score = match_one(name, folders)
-        n_skill, n_score = match_one(name, names)
-        if n_score > 0.6:
-            for s in self.skills:
-                if self.skills[s]["name"] == n_skill:
-                    LOG.info("found skill by name")
-                    return s
-        elif f_score > 0.6:
-            LOG.info("found skill by folder name")
-            return f_skill
-        return None
-
-    @staticmethod
-    def git_from_folder(path):
-        try:
-            website = subprocess.check_output(["git", "remote", "-v"], cwd=path)
-            website = website.replace("origin\t", "").replace(" (fetch)", "").split("\n")[0]
-        except:
-            website = None
-        return website
-
-    @staticmethod
-    def github_url_check(url=""):
-        if not url.startswith("https://github.com"):
-            raise AttributeError("this url does not seem to be form github: " + url)
-
-    # handling skills config
-
-    def remove_from_priority_list(self, skill_name):
-        skill_folder = self.match_name_to_folder(skill_name)
-        if skill_folder is None:
-            LOG.warning("could not find skill to remove from priority list")
-            data = {"folder": skill_name}
-            skill_folder = skill_name
-        else:
-            data = self.skills[skill_folder]
-            if not data["downloaded"]:
-                LOG.debug("removing skill from priority list, but it is not downloaded")
-
-        config = self.skills_config
-        if "priority_skills" not in config:
-            config["priority_skills"] = []
-        if skill_folder in config["priority_skills"]:
-            config["priority_skills"].remove(skill_folder)
-            LOG.info("Skill removed  from priority list: " + skill_folder)
-            self.update_skills_config(config)
-            self.send_message("skill.deprioritized", data)
-        else:
-            LOG.info("Skill is not in priority list: " + skill_folder)
-            return False
-        return True
-
-    def add_to_priority_list(self, skill_name):
-        skill_folder = self.match_name_to_folder(skill_name)
-        if skill_folder is None:
-            LOG.warning("could not find skill to add to priority list")
-            data = {"folder": skill_name}
-            skill_folder = skill_name
-        else:
-            data = self.skills[skill_folder]
-            if not data["downloaded"]:
-                LOG.debug("Adding skill to priority list, but it is not downloaded")
-
-        config = self.skills_config
-        if "priority_skills" not in config:
-            config["priority_skills"] = []
-        if skill_folder not in config["priority_skills"]:
-            config["priority_skills"].append(skill_folder)
-            LOG.info("Skill added to priority list: " + skill_folder)
-            self.update_skills_config(config)
-            self.send_message("skill.prioritized", data)
-        else:
-            LOG.info("Skill already in priority list: " + skill_folder)
-        return True
-
-    def remove_from_blacklist(self, skill_name):
-        skill_folder = self.match_name_to_folder(skill_name)
-        if skill_folder is None:
-            LOG.warning("could not find skill to unblacklist")
-            data = {"folder": skill_name}
-            skill_folder = skill_name
-        else:
-            data = self.skills[skill_folder]
-            if not data["downloaded"]:
-                LOG.debug("Whitelisting skill, but it is not downloaded")
-
-        config = self.skills_config
-        if "blacklisted_skills" not in config:
-            config["blacklisted_skills"] = []
-
-        if skill_folder in config["blacklisted_skills"]:
-            config["blacklisted_skills"].remove(skill_folder)
-            LOG.info("Skill UnBlacklisted: " + skill_folder)
-            self.update_skills_config(config)
-            self.send_message("skill.whitelisted", data)
-        else:
-            LOG.info("Skill is not in blacklist: " + skill_folder)
-            return False
-        return True
-
-    def add_to_blacklist(self, skill_name):
-        skill_folder = self.match_name_to_folder(skill_name)
-        if skill_folder is None:
-            LOG.warning("could not find skill to blacklist")
-            data = {"folder": skill_name}
-            skill_folder = skill_name
-        else:
-            data = self.skills[skill_folder]
-            if not data["downloaded"]:
-                LOG.debug("Blacklisting skill, but it is not downloaded")
-
-        config = self.skills_config
-        if "blacklisted_skills" not in config:
-            config["blacklisted_skills"] = []
-
-        if skill_folder not in config["blacklisted_skills"]:
-            config["blacklisted_skills"].append(skill_folder)
-            LOG.info("Skill Blacklisted: " + skill_folder)
-            self.send_message("skill.blacklisted", data)
-            self.update_skills_config(config)
-        else:
-            LOG.info("Skill already Blacklisted: " + skill_folder)
-        LOG.info("reloading skill to trigger shutdown")
-        self.reload_skill(skill_folder)
-        return True
-
-    def change_skills_directory(self, skills_dir):
-        config = self.skills_config
-        config["directory"] = skills_dir
-        # create skills dir if missing
-        if not exists(skills_dir):
-            LOG.info("creating skills dir")
-            makedirs(skills_dir)
-        self.update_skills_config(config)
-
-    def update_skills_config(self, config=None):
-        conf = LocalConf(USER_CONFIG)
-        conf['skills'] = config or self.skills_config
-        conf.store()
-        self.send_message("skills.config.updated")
-
-    def reload_skill(self, skill_name):
-        skill_folder = self.match_name_to_folder(skill_name)
-        self.send_message("skill.reloading", {"name": skill_folder})
-        if skill_folder is None:
-            LOG.error("Could not find skill to reload: " + skill_name)
-            self.send_message("skill.reload.failed", {"name": skill_folder, "error": "skill not found"})
-            return False
-        path = self.skills[skill_folder]["path"]
-        touch(path)
-        self.send_message("skill.reloading", self.skills[skill_folder])
-        return True
-
-
-class JarbasSkillsManager(MycroftSkillsManager):
-    SKILLS_MODULES = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/"
-    SKILLS_DEFAULTS_URL = "https://raw.githubusercontent.com/JarbasAl/jarbas_skills_repo/master/DEFAULT_SKILLS"
-
-    def __init__(self, emitter=None, skills_config=None, defaults_url=None, modules_url=None):
-        self.msm = MycroftSkillsManager(emitter, skills_config)
-        defaults_url = defaults_url or self.SKILLS_DEFAULTS_URL
-        modules_url = modules_url or self.SKILLS_MODULES
-        super(JarbasSkillsManager, self).__init__(emitter, skills_config, defaults_url, modules_url)
-
-    @property
-    def mycroft_repo_skills(self):
-        """ get skills list from mycroft skills repo """
-        LOG.info("scanning Mycroft skills repo")
-        return self.msm.scan_skills_repo()
-
-    def get_default_skills(self):
-        """ get default skills list from url """
-        LOG.info("retrieving default jarbas skills list")
-        defaults = {}
-        try:
-            # get core and common skills
-            text = requests.get(self.defaults_url).text
-            core = text.split("# core")[1]
-            core, common = core.split("# common")
-            core = [c for c in core.split("\n") if c]
-            common = [c for c in common.split("\n") if c]
-        except:
-            core = common = []
-        defaults["core"] = core
-        defaults["common"] = common
-        # get picroft
-        try:
-            text = requests.get(self.defaults_url + ".picroft").text
-            picroft = text.split("# picroft")[1]
-            picroft = [c for c in picroft.split("\n") if c]
-        except:
-            picroft = []
-        defaults["picroft"] = picroft
-        # get kde
-        try:
-            text = requests.get(self.defaults_url + ".kde").text
-            kde = text.split("# desktop")[1]
-            kde = [c for c in kde.split("\n") if c]
-        except:
-            kde = []
-        defaults["desktop"] = kde
-        # get mark 1
-        try:
-            text = requests.get(self.defaults_url + ".mycroft_mark_1").text
-            mk1 = text.split("# mark 1")[1]
-            mk1 = [c for c in mk1.split("\n") if c]
-        except:
-            mk1 = []
-        defaults["mycroft_mark_1"] = mk1
-        # get jarbas
-        try:
-            text = requests.get(self.defaults_url + ".jarbas").text
-            jarbas = text.split("# jarbas")[1]
-            jarbas = [c for c in jarbas.split("\n") if c]
-        except:
-            jarbas = []
-        defaults["jarbas"] = jarbas
-        # on error use hard coded defaults
-        LOG.info("default jarbas skills: " + str(defaults))
-        return defaults or self.DEFAULT_SKILLS
-
-    def scan_skills_repo(self):
-        """ get skills list from skills repo """
-        LOG.info("scanning Jarbas skills repo")
-        platforms = ["core", "common", "kde", "jarbas", "desktop", "picroft",  "mycroft_mark_1"]
-        scanned = []
-        for platform in platforms:
-            text = requests.get(self.modules_url+platform+".txt").text
-            skills = text.splitlines()
-            for s in skills:
+    def install_defaults(self):
+        """ installs the default skills, updates all others """
+        errored = False
+        default_skills = self.get_defaults()
+        for group in {"default", self.platform}:
+            if group not in default_skills:
+                LOG.warning('No such platform: {}'.format(group))
+                continue
+            LOG.info("Installing {} skills".format(group))
+            for skill in default_skills[group]:
                 try:
-                    name, url = s.split(",")
-                except Exception as e:
-                    name = s.replace(",","").strip()
-                    url = None
-                if not url:
-                    url = self.msm.name_info(name).get("repo")
-                    if not url:
-                        continue
-                scanned.append(name)
-                skill_folder = url.split("/")[-1].replace(".git", "")
-                skill_path = join(self.skills_dir, skill_folder)
-                skill_id = hash(skill_path)
-                skill_author = url.split("/")[-2]
-                downloaded = False
-                if skill_folder in self.downloaded_skills:
-                    downloaded = True
-                self.skills[skill_folder] = {"repo": url.strip(), "folder": skill_folder, "path": skill_path, "id": skill_id,
-                                             "author": skill_author, "name": name, "downloaded": downloaded}
+                    if not skill.is_local:
+                        skill.install()
+                    else:
+                        skill.update()
+                except InstallException as e:
+                    LOG.error('Error installing {}: {}'.format(skill, repr(e)))
+                    errored = True
+        return not errored
 
-            LOG.info("scanned " + platform + ": " + str(skills))
-        return scanned
+    def get_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
+        """ returns {'skill_group': [SkillEntry('name')]} """
+        self.repo.update()
+        skills = self.list()
+        name_to_skill = {skill.name: skill for skill in skills}
+        defaults = {group: [] for group in self.SKILL_GROUPS}
+
+        for section_name, skill_names in self.repo.get_default_skill_names():
+            section_skills = []
+            for skill_name in skill_names:
+                if skill_name in name_to_skill:
+                    section_skills.append(name_to_skill[skill_name])
+                else:
+                    LOG.warning('No such default skill: ' + skill_name)
+                defaults[section_name] = section_skills
+
+        return defaults
+
+    @staticmethod
+    def _unique_skills(skills):
+        return list({i.repo: i for i in skills}.values())
+
+    def _generate_repo_to_name(self):
+        return {
+            SkillEntry.extract_repo(url): name
+            for name, url in self.repo.get_submodules()
+        }
+
+    def list(self):
+        return self._unique_skills(chain(
+            self.load_remote_skill_data(),
+            self.load_local_skill_data()
+        ))
+
+    def load_local_skill_data(self):
+        """ load data about downloaded skills """
+        if not exists(self.skills_dir):
+            return []
+
+        repo_to_name = self._generate_repo_to_name()
+        return (
+            SkillEntry.from_folder(dirname(skill_file), repo_to_name)
+            for skill_file in glob(join(self.skills_dir, '*',
+                                        MainModule + '.py'))
+        )
+
+    def load_remote_skill_data(self):
+        """ get skills list from skills repo """
+        self.repo.update()
+        repo_to_name = self._generate_repo_to_name()
+
+        for name, url in self.repo.get_submodules():
+            yield SkillEntry.from_url(url, self.skills_dir, repo_to_name)
+
+    def find_skill(self, param, author=None, skills=None):
+        # type: (str, str, List[SkillEntry]) -> SkillEntry
+        """Find skill by name or url"""
+        if param.startswith('https://') or param.startswith('http://'):
+            repo_to_name = self._generate_repo_to_name()
+            return SkillEntry.from_url(param, self.skills_dir, repo_to_name)
+        else:
+            skill_confs = {
+                skill: skill.match(param, author)
+                for skill in skills or self.list()
+            }
+            best_skill, score = max(skill_confs.items(), key=lambda x: x[1])
+            LOG.debug('Best match ({}): {} by {}'.format(
+                round(score, 2), best_skill.name, best_skill.author)
+            )
+            if score < 0.3:
+                raise SkillNotFound(param)
+            low_bound = (score * 0.7) if score != 1.0 else 1.0
+
+            close_skills = [
+                skill for skill, conf in skill_confs.items()
+                if conf >= low_bound and skill != best_skill
+            ]
+            if close_skills:
+                raise MultipleSkillMatches([best_skill] + close_skills)
+            return best_skill
 
 
-def touch(fname):
+def skill_info(skill):
+    print('\n'.join([
+        'Name: ' + skill.name,
+        'Author: ' + str(skill.author),
+        'Url: ' + str(skill.url),
+        'Path: ' + str(skill.path) if skill.is_local else 'Not installed'
+    ]))
+
+
+def main():
+    import argparse
+    platforms = list(MycroftSkillsManager.SKILL_GROUPS)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--platform', choices=platforms)
+    parser.add_argument('-u', '--repo-url')
+    parser.add_argument('-b', '--repo-branch')
+    parser.add_argument('-d', '--skills-dir')
+    parser.add_argument('-r', '--raw', action='store_true')
+    parser.set_defaults(raw=False)
+    subparsers = parser.add_subparsers(dest='action')
+    subparsers.required = True
+
+    def add_search_args(subparser):
+        subparser.add_argument('skill')
+        subparser.add_argument('author', nargs='?')
+
+    add_search_args(subparsers.add_parser('install'))
+    add_search_args(subparsers.add_parser('remove'))
+    add_search_args(subparsers.add_parser('search'))
+    add_search_args(subparsers.add_parser('info'))
+    subparsers.add_parser('list').add_argument('-i', '--installed',
+                                               action='store_true')
+    subparsers.add_parser('update')
+    subparsers.add_parser('default')
+    args = parser.parse_args()
+
+    if args.raw:
+        LOG.level = ERROR
+
+    repo = SkillRepo(url=args.repo_url, branch=args.repo_branch)
+    msm = MycroftSkillsManager(args.platform, args.skills_dir, repo)
+    main_functions = {
+        'install': lambda: msm.install(args.skill, args.author),
+        'remove': lambda: msm.remove(args.skill, args.author),
+        'list': lambda: print('\n'.join(
+            skill.name + (
+                '\t[installed]' if skill.is_local and not args.raw else ''
+            )
+            for skill in msm.list()
+            if not args.installed or skill.is_local
+        )),
+        'update': msm.update,
+        'default': msm.install_defaults,
+        'search': lambda: print('\n'.join(
+            skill.name
+            for skill in msm.list()
+            if skill.match(args.skill, args.author) >= 0.3
+        )),
+        'info': lambda: skill_info(msm.find_skill(args.skill, args.author))
+    }
     try:
-        utime(fname, None)
-    except OSError:
-        open(fname, 'a').close()
+        main_functions[args.action]()
+    except MsmException as e:
+        exc_type = e.__class__.__name__
+        print('{}: {}'.format(exc_type, str(e)))
+        return 1 + (sum(map(ord, exc_type)) % 255)
 
 
 if __name__ == "__main__":
-    from mycroft.messagebus.client.ws import WebsocketClient
-    from threading import Thread
-    import argparse
-    from time import sleep
-    from sys import exit
-
-    ws = WebsocketClient()
-
-    def connect():
-        ws.run_forever()
-
-    ws_thread = Thread(target=connect)
-    ws_thread.setDaemon(True)
-    ws_thread.start()
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("option", help="action to take, defaults to install default skills, list to list available skills, install {url_or_name} to install a skill")
-    parser.add_argument("skill", help="skill to install", action="store_true")
-    args = parser.parse_args()
-    option = args.option
-
-    while not ws.started_running:
-        print "waiting for websocket connection..."
-        sleep(2)
-
-    msm = JarbasSkillsManager(emitter=ws)
-
-    if option in ["-d", "--defaults", "defaults"]:
-        msm.install_defaults()
-        exit(0)
-    elif option in ["-l", "--list", "list"]:
-        msm.list_skills()
-        exit(0)
-    elif option in ["-i", "install"]:
-        if args.skill:
-            if args.skill.startswith("http"):
-                msm.install_by_url(args.skill)
-            else:
-                msm.install_by_name(args.skill)
-            exit(0)
-        print "bad skill name"
-        exit(666)
-    ws_thread.join(0)
-    exit(5373)
+    main()
