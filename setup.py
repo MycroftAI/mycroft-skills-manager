@@ -12,7 +12,7 @@ setup(
     description='Mycroft Skill Manager, in python!',
     entry_points={
         'console_scripts': {
-            'msm=py_msm.__init__:main'
+            'msm=py_msm.__main__:main'
         }
     }
 )
