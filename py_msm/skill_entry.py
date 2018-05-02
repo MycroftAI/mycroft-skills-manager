@@ -133,7 +133,8 @@ class SkillEntry(object):
                     getattr(sys, 'real_prefix', None) or
                     getattr(sys, 'base_prefix', sys.prefix)
             )
-            pip_exe = sys.executable.replace(sys.prefix, base_prefix)
+            python_exe = sys.executable.replace(sys.prefix, base_prefix)
+            pip_exe = python_exe.replace('python', 'pip')
             pip_code = call(['sudo', '-n', pip_exe] + pip_args)
         else:
             LOG.error('Permission denied while installing pip dependencies. '
