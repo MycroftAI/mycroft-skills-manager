@@ -22,11 +22,11 @@ class MycroftSkillsManager(object):
     def __init__(self, platform='default', skills_dir=None, repo=None):
         self.platform = platform
         self.skills_dir = expanduser(skills_dir or '') \
-                          or self.DEFAULT_SKILLS_DIR
+            or self.DEFAULT_SKILLS_DIR
         self.repo = repo or SkillRepo()
 
     def install(self, param, author=None):
-        """ install by url or name """
+        """Install by url or name"""
         skill = self.find_skill(param, author)
         skill.install()
         for skill_dep in skill.get_dependent_skills():
@@ -34,11 +34,11 @@ class MycroftSkillsManager(object):
             self.install(skill_dep)
 
     def remove(self, param, author=None):
-        """ remove by url or name"""
+        """Remove by url or name"""
         self.find_skill(param, author).remove()
 
     def update(self):
-        """ update all downloaded skills """
+        """Update all downloaded skills"""
         errored = False
         for skill in self.load_local_skill_data():
             try:
@@ -49,7 +49,7 @@ class MycroftSkillsManager(object):
         return not errored
 
     def install_defaults(self):
-        """ installs the default skills, updates all others """
+        """Installs the default skills, updates all others"""
         errored = False
         default_skills = self.get_defaults()
         for group in {"default", self.platform}:
@@ -64,12 +64,13 @@ class MycroftSkillsManager(object):
                     else:
                         skill.update()
                 except InstallException as e:
-                    LOG.error('Error installing {}: {}'.format(skill, repr(e)))
+                    LOG.error('Error installing {}: {}'.format(skill.name,
+                                                               repr(e)))
                     errored = True
         return not errored
 
     def get_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
-        """ returns {'skill_group': [SkillEntry('name')]} """
+        """Returns {'skill_group': [SkillEntry('name')]}"""
         self.repo.update()
         skills = self.list()
         name_to_skill = {skill.name: skill for skill in skills}
@@ -103,7 +104,7 @@ class MycroftSkillsManager(object):
         ))
 
     def load_local_skill_data(self):
-        """ load data about downloaded skills """
+        """Load data about downloaded skills"""
         if not exists(self.skills_dir):
             return []
 
@@ -114,7 +115,7 @@ class MycroftSkillsManager(object):
         )
 
     def load_remote_skill_data(self):
-        """ get skills list from skills repo """
+        """Get skills list from skills repo"""
         self.repo.update()
         repo_to_name = self._generate_repo_to_name()
 

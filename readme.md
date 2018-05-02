@@ -2,7 +2,7 @@
 
 Mycroft Skill Manager, in python!
 
-## install
+## Install
 
     pip install py_msm
 
@@ -36,22 +36,13 @@ msm -b master -p kde default
 
 ## TODO
 
-- permissions issues in mark1/picroft - prepare_msm.sh script
-- get hashes before git pulling to decide if pip and res.sh should be run
-- handle pip sudo if not in venv
-- requirements.sh guide / template
-- parse readme.md from skills
+- Get hashes before git pulling to decide if pip and res.sh should be run
+- Parse readme.md from skills
 
 ## New Features
 
-- checks for skill_requirements.txt, will install skills listed there
-
-## troubleshooting
-
-got problem? most likely you forgot 
-
-    workon mycroft
+- Checks for skill_requirements.txt, will install skills listed there
 
 ## Credits
 
-JarbasAI
+JarbasAI and Mycroft AI

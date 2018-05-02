@@ -14,8 +14,6 @@ from git.exc import GitCommandError
 from os.path import exists, join, basename
 from subprocess import call
 
-from pip.status_codes import VIRTUALENV_NOT_FOUND
-
 from py_msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException
@@ -43,7 +41,7 @@ class SkillEntry(object):
 
     @classmethod
     def from_url(cls, url, skill_dir, repo_to_name):
-        """ shows information about the skill in the specified repo """
+        """Shows information about the skill in the specified repo"""
         url = url.rstrip('/')
 
         author = cls._extract_author(url)
@@ -118,8 +116,6 @@ class SkillEntry(object):
         )
 
     def run_pip(self):
-        # no need for sudo if in venv
-        # TODO handle sudo if not in venv
         # TODO check hash before re running
         requirements_file = join(self.path, "requirements.txt")
         if not exists(requirements_file):
@@ -142,10 +138,11 @@ class SkillEntry(object):
         else:
             LOG.error('Permission denied while installing pip dependencies. '
                       'Please run in virtualenv or use sudo')
+            from pip.status_codes import VIRTUALENV_NOT_FOUND
             raise PipRequirementsException(VIRTUALENV_NOT_FOUND)
 
         if pip_code != 0:  # TODO parse pip code
-            LOG.error("pip code: " + str(pip_code))
+            LOG.error("Pip code: " + str(pip_code))
             raise PipRequirementsException(pip_code)
 
         return True
@@ -173,7 +170,6 @@ class SkillEntry(object):
             return [i.strip() for i in f.readlines() if i.strip()]
 
     def install(self):
-        """ installs or updates skill by url """
         if self.is_local:
             raise AlreadyInstalled(self.name)
 
@@ -213,7 +209,7 @@ class SkillEntry(object):
 
     @staticmethod
     def find_git_url(path):
-        """ get the git url from a folder"""
+        """Get the git url from a folder"""
         try:
             return Git(path).config('remote.origin.url')
         except GitCommandError:
