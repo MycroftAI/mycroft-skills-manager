@@ -5,10 +5,16 @@ import subprocess
 from difflib import SequenceMatcher
 from shutil import rmtree
 
+import sys
+
+import os
 from git import Repo
 from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename
+from subprocess import call
+
+from pip.status_codes import VIRTUALENV_NOT_FOUND
 
 from py_msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
@@ -119,12 +125,26 @@ class SkillEntry(object):
         if not exists(requirements_file):
             return False
 
-        import pip  # must be here or pip throws error code 2 on threads
         LOG.info('Installing requirements.txt')
-        pip_code = pip.main(['install', '-r', requirements_file])
-        # TODO parse pip code
+        can_pip = os.access(sys.executable, os.W_OK)
+        pip_args = ['install', '-r', requirements_file]
 
-        if pip_code != 0:
+        if can_pip:
+            import pip  # must be here or pip throws error code 2 on threads
+            pip_code = pip.main(pip_args)
+        elif call(['sudo', '-n', 'true']) == 0:
+            base_prefix = (
+                    getattr(sys, 'real_prefix', None) or
+                    getattr(sys, 'base_prefix', sys.prefix)
+            )
+            pip_exe = sys.executable.replace(sys.prefix, base_prefix)
+            pip_code = call(['sudo', '-n', pip_exe] + pip_args)
+        else:
+            LOG.error('Permission denied while installing pip dependencies. '
+                      'Please run in virtualenv or use sudo')
+            raise PipRequirementsException(VIRTUALENV_NOT_FOUND)
+
+        if pip_code != 0:  # TODO parse pip code
             LOG.error("pip code: " + str(pip_code))
             raise PipRequirementsException(pip_code)
 
