@@ -2,13 +2,11 @@ from __future__ import print_function
 
 import logging
 from glob import glob
-from itertools import chain
 
-from os.path import exists, expanduser, join, dirname
+from os.path import expanduser, join, dirname
 from typing import Dict, List
 
-from py_msm.exceptions import MsmException, InstallException, \
-    SkillNotFound, MultipleSkillMatches
+from py_msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
 from py_msm.skill_entry import SkillEntry
 from py_msm.skill_repo import SkillRepo
 
@@ -19,11 +17,13 @@ class MycroftSkillsManager(object):
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
 
-    def __init__(self, platform='default', skills_dir=None, repo=None):
+    def __init__(self, platform='default', skills_dir=None, repo=None,
+                 versioned=True):
         self.platform = platform
         self.skills_dir = expanduser(skills_dir or '') \
             or self.DEFAULT_SKILLS_DIR
         self.repo = repo or SkillRepo()
+        self.versioned = versioned
 
     def install(self, param, author=None):
         """Install by url or name"""
@@ -40,7 +40,9 @@ class MycroftSkillsManager(object):
     def update(self):
         """Update all downloaded skills"""
         errored = False
-        for skill in self.load_local_skill_data():
+        for skill in self.list():
+            if not skill.is_local:
+                continue
             try:
                 skill.update()
             except MsmException as e:
@@ -63,7 +65,7 @@ class MycroftSkillsManager(object):
                         skill.install()
                     else:
                         skill.update()
-                except InstallException as e:
+                except MsmException as e:
                     LOG.error('Error installing {}: {}'.format(skill.name,
                                                                repr(e)))
                     errored = True
@@ -91,43 +93,40 @@ class MycroftSkillsManager(object):
     def _unique_skills(skills):
         return list({i.repo: i for i in skills}.values())
 
-    def _generate_repo_to_name(self):
-        return {
-            SkillEntry.extract_repo(url): name
-            for name, url in self.repo.get_submodules()
-        }
-
     def list(self):
-        return self._unique_skills(chain(
-            self.load_remote_skill_data(),
-            self.load_local_skill_data()
-        ))
-
-    def load_local_skill_data(self):
         """Load data about downloaded skills"""
-        if not exists(self.skills_dir):
-            return []
-
-        repo_to_name = self._generate_repo_to_name()
-        return (
-            SkillEntry.from_folder(dirname(skill_file), repo_to_name)
-            for skill_file in glob(join(self.skills_dir, '*', '__init__.py'))
-        )
-
-    def load_remote_skill_data(self):
-        """Get skills list from skills repo"""
         self.repo.update()
-        repo_to_name = self._generate_repo_to_name()
-
-        for name, url in self.repo.get_submodules():
-            yield SkillEntry.from_url(url, self.skills_dir, repo_to_name)
+        remote_skill_list = (
+            SkillEntry(
+                name, SkillEntry.create_path(self.skills_dir, url, name),
+                url, sha if self.versioned else ''
+            )
+            for name, path, url, sha in self.repo.get_skill_data()
+        )
+        remote_skills = {
+            skill.id: skill for skill in remote_skill_list
+        }
+        all_skills = []
+        for skill_file in glob(join(self.skills_dir, '*', '__init__.py')):
+            skill = SkillEntry.from_folder(dirname(skill_file))
+            if skill.id in remote_skills:
+                skill.attach(remote_skills.pop(skill.id))
+            all_skills.append(skill)
+        all_skills += list(remote_skills.values())
+        return all_skills
 
     def find_skill(self, param, author=None, skills=None):
         # type: (str, str, List[SkillEntry]) -> SkillEntry
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
-            repo_to_name = self._generate_repo_to_name()
-            return SkillEntry.from_url(param, self.skills_dir, repo_to_name)
+            self.repo.update()
+            repo_id = SkillEntry.extract_repo_id(param)
+            for skill in self.list():
+                if skill.id == repo_id:
+                    return skill
+            name = SkillEntry.extract_repo_name(param)
+            path = SkillEntry.create_path(self.skills_dir, param)
+            return SkillEntry(name, path, param)
         else:
             skill_confs = {
                 skill: skill.match(param, author)

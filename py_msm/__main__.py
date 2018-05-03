@@ -25,12 +25,15 @@ def main():
     import argparse
     platforms = list(MycroftSkillsManager.SKILL_GROUPS)
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--platform', choices=platforms)
+    parser.add_argument('-p', '--platform', choices=platforms,
+                        default='default')
     parser.add_argument('-u', '--repo-url')
     parser.add_argument('-b', '--repo-branch')
     parser.add_argument('-d', '--skills-dir')
+    parser.add_argument('-l', '--latest', action='store_false',
+                        dest='versioned', help="Disable skill versioning")
     parser.add_argument('-r', '--raw', action='store_true')
-    parser.set_defaults(raw=False)
+    parser.set_defaults(raw=False, versioned=True)
     subparsers = parser.add_subparsers(dest='action')
     subparsers.required = True
 
@@ -52,7 +55,8 @@ def main():
         LOG.level = ERROR
 
     repo = SkillRepo(url=args.repo_url, branch=args.repo_branch)
-    msm = MycroftSkillsManager(args.platform, args.skills_dir, repo)
+    msm = MycroftSkillsManager(args.platform, args.skills_dir, repo,
+                               args.versioned)
     main_functions = {
         'install': lambda: msm.install(args.skill, args.author),
         'remove': lambda: msm.remove(args.skill, args.author),

@@ -9,7 +9,6 @@ import sys
 
 import os
 
-import pip
 from git import Repo
 from git.cmd import Git
 from git.exc import GitCommandError
@@ -24,40 +23,36 @@ LOG = logging.getLogger(__name__)
 
 
 class SkillEntry(object):
-    def __init__(self, path, name=None, author=None, url=None):
+    def __init__(self, name, path, url='', sha=''):
+        url = url.rstrip('/')
+        self.name = name
         self.path = path
-        self.name = name or basename(path)
-        self.author = author
+        self.sha = sha
         self.url = url
-        self.repo = SkillEntry.extract_repo(url)
+        self.author = self._extract_author(url) if url else ''
+        self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
 
+    def attach(self, remote_entry):
+        """Attach a remote entry to a local entry"""
+        self.name = remote_entry.name
+        self.sha = remote_entry.sha
+        self.url = remote_entry.url
+        self.author = remote_entry.author
+        return self
+
     @classmethod
-    def from_folder(cls, path, repo_to_name):
-        url = cls.find_git_url(path).rstrip('/')
-
-        author = cls._extract_author(url) if url else None
-        repo = cls.extract_repo(url) if url else None
-        name = repo_to_name.get(repo, basename(path))
-        return cls(path, name, author, url)
+    def from_folder(cls, path):
+        return cls(basename(path), path, cls.find_git_url(path))
 
     @classmethod
-    def from_url(cls, url, skill_dir, repo_to_name):
-        """Shows information about the skill in the specified repo"""
-        url = url.rstrip('/')
-
-        author = cls._extract_author(url)
-        repo = cls.extract_repo(url)
-
-        path = join(skill_dir, '{}.{}'.format(
-            cls._extract_folder(url), author
+    def create_path(cls, folder, url, name=''):
+        return join(folder, '{}.{}'.format(
+            name or cls.extract_repo_name(url), cls._extract_author(url)
         ))
 
-        name = repo_to_name.get(repo, basename(path))
-        return cls(path, name, author, url)
-
     @staticmethod
-    def _extract_folder(url):
+    def extract_repo_name(url):
         s = url.split("/")[-1]
         a, b, c = s.rpartition('.git')
         if not c:
@@ -69,9 +64,9 @@ class SkillEntry(object):
         return url.split("/")[-2].split(':')[-1]
 
     @classmethod
-    def extract_repo(cls, url):
+    def extract_repo_id(cls, url):
         return '{}:{}'.format(cls._extract_author(url),
-                              cls._extract_folder(url))
+                              cls.extract_repo_name(url)).lower()
 
     @staticmethod
     def _tokenize(x):
@@ -137,7 +132,7 @@ class SkillEntry(object):
                           'dependencies. Please run in virtualenv or use sudo')
                 raise PipRequirementsException(2)
 
-        pip_code = call(pip_args)
+        pip_code = call(pip_args, stdout=PIPE)
         if pip_code != 0:  # TODO parse pip code
             LOG.error("Pip code: " + str(pip_code))
             raise PipRequirementsException(pip_code)
@@ -173,6 +168,7 @@ class SkillEntry(object):
         LOG.info("Downloading skill: " + self.url)
         try:
             Repo.clone_from(self.url, self.path)
+            Git(self.path).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
             raise CloneException(str(e))
 
@@ -184,8 +180,10 @@ class SkillEntry(object):
     def update(self):
         # TODO compare hashes to decide if pip and res.sh should be run
         # TODO ensure skill master branch is checked out, else dont update
+        git = Git(self.path)
         try:
-            Git(self.path).pull(ff_only=True)
+            git.fetch()
+            git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
             raise SkillModified(e.stderr)
 
@@ -210,7 +208,7 @@ class SkillEntry(object):
         try:
             return Git(path).config('remote.origin.url')
         except GitCommandError:
-            return None
+            return ''
 
     def __repr__(self):
         return '<SkillEntry {}>'.format(' '.join(

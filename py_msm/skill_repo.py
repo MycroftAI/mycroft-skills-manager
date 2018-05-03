@@ -16,6 +16,7 @@ class SkillRepo(object):
         self.path = path or "/opt/mycroft/.skills-repo"
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
         self.branch = branch or "18.02"
+        self.repo_info = {}
 
     def read_file(self, filename):
         with open(join(self.path, filename)) as f:
@@ -33,18 +34,29 @@ class SkillRepo(object):
         git.fetch()
         try:
             git.reset('origin/' + self.branch, hard=True)
-        except GitCommandError as e:
+        except GitCommandError:
             raise MsmException('Invalid branch: ' + self.branch)
 
-    def get_submodules(self):
-        """ generates tuples of skill_name, skill_url """
+    def get_skill_data(self):
+        """ generates tuples of name, path, url """
+        path_to_sha = {
+            folder: sha for folder, sha in self.get_shas()
+        }
         modules = self.read_file('.gitmodules').split('[submodule "')
         for module in modules:
             if not module:
                 continue
             name = module.split('"]')[0].strip()
+            path = module.split('path = ')[1].split('\n')[0].strip()
             url = module.split('url = ')[1].strip()
-            yield name, url
+            sha = path_to_sha.get(path, '')
+            yield name, path, url, sha
+
+    def get_shas(self):
+        git = Git(self.path)
+        for line in git.ls_tree('origin/' + self.branch).split('\n'):
+            size, typ, sha, folder = line.split()
+            yield folder, sha
 
     def get_default_skill_names(self):
         for defaults_file in glob(join(self.path, 'DEFAULT-SKILLS*')):
