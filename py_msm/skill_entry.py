@@ -12,7 +12,7 @@ import os
 from git import Repo
 from git.cmd import Git
 from git.exc import GitCommandError
-from os.path import exists, join, basename
+from os.path import exists, join, basename, dirname
 from subprocess import call, PIPE
 
 from py_msm.exceptions import PipRequirementsException, \
@@ -119,7 +119,7 @@ class SkillEntry(object):
             return False
 
         LOG.info('Installing requirements.txt')
-        can_pip = os.access(sys.executable, os.W_OK)
+        can_pip = os.access(dirname(sys.executable), os.W_OK)
         pip_args = [
             sys.executable, '-m', 'pip', 'install', '-r', requirements_file
         ]
