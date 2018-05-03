@@ -2,7 +2,10 @@ from __future__ import print_function
 
 import logging
 from glob import glob
+from itertools import chain
+from threading import Thread
 
+from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname
 from typing import Dict, List
 
@@ -39,37 +42,40 @@ class MycroftSkillsManager(object):
 
     def update(self):
         """Update all downloaded skills"""
-        errored = False
-        for skill in self.list():
-            if not skill.is_local:
-                continue
+        def run_update(skill):
             try:
                 skill.update()
+                return True
             except MsmException as e:
                 LOG.error('Error updating {}: {}'.format(skill, repr(e)))
-                errored = True
-        return not errored
+                return False
+
+        local_skills = [skill for skill in self.list() if skill.is_local]
+        return all(ThreadPool().map(run_update, local_skills))
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
-        errored = False
-        default_skills = self.get_defaults()
-        for group in {"default", self.platform}:
-            if group not in default_skills:
-                LOG.warning('No such platform: {}'.format(group))
-                continue
-            LOG.info("Installing {} skills".format(group))
-            for skill in default_skills[group]:
-                try:
-                    if not skill.is_local:
-                        skill.install()
-                    else:
-                        skill.update()
-                except MsmException as e:
-                    LOG.error('Error installing {}: {}'.format(skill.name,
-                                                               repr(e)))
-                    errored = True
-        return not errored
+        skill_groups = self.get_defaults()
+
+        if self.platform not in skill_groups:
+            LOG.error('Unknown platform:' + self.platform)
+
+        def install_default(skill):
+            try:
+                if not skill.is_local:
+                    skill.install()
+                else:
+                    skill.update()
+                return True
+            except MsmException as e:
+                LOG.error('Error installing {}: {}'.format(skill.name,
+                                                           repr(e)))
+                return False
+        default_skills = chain(*[
+            skill_groups.get(i, []) for i in {'default', self.platform}
+        ])
+
+        return all(ThreadPool().map(install_default, default_skills))
 
     def get_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""

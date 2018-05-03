@@ -133,7 +133,7 @@ class SkillEntry(object):
                 raise PipRequirementsException(2)
 
         pip_code = call(pip_args, stdout=PIPE)
-        if pip_code != 0:  # TODO parse pip code
+        if pip_code != 0:
             LOG.error("Pip code: " + str(pip_code))
             raise PipRequirementsException(pip_code)
 
@@ -141,7 +141,6 @@ class SkillEntry(object):
 
     def run_requirements_sh(self):
         setup_script = join(self.path, "requirements.sh")
-        # TODO check hash before re running
         if not exists(setup_script):
             return False
 
@@ -178,18 +177,24 @@ class SkillEntry(object):
         self.is_local = True
 
     def update(self):
-        # TODO compare hashes to decide if pip and res.sh should be run
-        # TODO ensure skill master branch is checked out, else dont update
         git = Git(self.path)
+
+        sha_before = git.rev_parse('HEAD')
+
         try:
             git.fetch()
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
             raise SkillModified(e.stderr)
 
-        self.run_requirements_sh()
-        self.run_pip()
-        LOG.info('Updated ' + self.name)
+        sha_after = git.rev_parse('HEAD')
+
+        if sha_before != sha_after:
+            self.run_requirements_sh()
+            self.run_pip()
+            LOG.info('Updated ' + self.name)
+        else:
+            LOG.info('Nothing new for ' + self.name)
 
     def remove(self):
         if not self.is_local:
