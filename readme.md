@@ -13,7 +13,7 @@ from py_msm import MycroftSkillsManager, SkillRepo, MultipleSkillMatches
 
 msm = MycroftSkillsManager(repo=SkillRepo(branch='master'))
 
-# msm = MycroftSkillsManager(platform='picroft', skills_dir='/some/path', repo=SkillRepo(branch='master', url='https://github.com/me/my-repo.git')
+# msm = MycroftSkillsManager(platform='picroft', skills_dir='/some/path', repo=SkillRepo(branch='master', url='https://github.com/me/my-repo.git'))
 
 print(msm.find_skill('bitcoin price'))
 msm.install('bitcoin', 'dmp1ce')

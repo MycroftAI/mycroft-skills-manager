@@ -94,7 +94,15 @@ class MycroftSkillsManager(object):
         return list({i.repo: i for i in skills}.values())
 
     def list(self):
-        """Load data about downloaded skills"""
+        """
+        Load a list of SkillEntry objects from both local and
+        remote skills
+
+        It is necessary to load both local and remote skills at
+        the same time to correctly associate local skills with the name
+        in the repo and remote skills with any custom path that they
+        have been downloaded to
+        """
         self.repo.update()
         remote_skill_list = (
             SkillEntry(
