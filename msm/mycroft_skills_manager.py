@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import logging
 from glob import glob
 from itertools import chain
@@ -91,10 +89,6 @@ class MycroftSkillsManager(object):
                 defaults[section_name] = section_skills
 
         return defaults
-
-    @staticmethod
-    def _unique_skills(skills):
-        return list({i.repo: i for i in skills}.values())
 
     def list(self):
         """
