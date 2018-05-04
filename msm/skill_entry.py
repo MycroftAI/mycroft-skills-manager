@@ -15,8 +15,8 @@ from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
 from subprocess import call, PIPE, Popen
 
-from py_msm import SkillRequirementsException
-from py_msm.exceptions import PipRequirementsException, \
+from msm import SkillRequirementsException
+from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException
 

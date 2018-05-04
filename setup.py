@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(
-    name='py-msm',
+    name='msm',
     version='0.4.2',
-    packages=['py_msm'],
+    packages=['msm'],
     install_requires=['GitPython', 'typing'],
     url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='MIT',
@@ -12,7 +12,7 @@ setup(
     description='Mycroft Skills Manager',
     entry_points={
         'console_scripts': {
-            'msm=py_msm.__main__:main'
+            'msm=msm.__main__:main'
         }
     }
 )

@@ -9,7 +9,7 @@ Mycroft Skill Manager, in python!
 ## Usage
 
 ```python
-from py_msm import MycroftSkillsManager, SkillRepo, MultipleSkillMatches
+from msm import MycroftSkillsManager, SkillRepo, MultipleSkillMatches
 
 msm = MycroftSkillsManager(repo=SkillRepo(branch='master'))
 

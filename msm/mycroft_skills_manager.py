@@ -8,9 +8,9 @@ from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname
 from typing import Dict, List
 
-from py_msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
-from py_msm.skill_entry import SkillEntry
-from py_msm.skill_repo import SkillRepo
+from msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
+from msm.skill_entry import SkillEntry
+from msm.skill_repo import SkillRepo
 
 LOG = logging.getLogger(__name__)
 

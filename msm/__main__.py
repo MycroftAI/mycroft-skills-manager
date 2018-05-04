@@ -3,9 +3,9 @@ from __future__ import print_function
 import logging
 from logging import ERROR, INFO
 
-from py_msm.exceptions import MsmException
-from py_msm.mycroft_skills_manager import MycroftSkillsManager
-from py_msm.skill_repo import SkillRepo
+from msm.exceptions import MsmException
+from msm.mycroft_skills_manager import MycroftSkillsManager
+from msm.skill_repo import SkillRepo
 
 LOG = logging.getLogger(__name__)
 

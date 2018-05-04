@@ -8,7 +8,7 @@ from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, isdir, dirname, basename
 
-from py_msm.exceptions import MsmException
+from msm.exceptions import MsmException
 
 
 class SkillRepo(object):
