@@ -77,7 +77,9 @@ def main():
         'info': lambda: skill_info(msm.find_skill(args.skill, args.author))
     }
     try:
-        main_functions[args.action]()
+        result = main_functions[args.action]()
+        if result is False:
+            return 1
     except MsmException as e:
         exc_type = e.__class__.__name__
         print('{}: {}'.format(exc_type, str(e)))
