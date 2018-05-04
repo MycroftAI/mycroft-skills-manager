@@ -39,7 +39,19 @@ class SystemRequirementsException(InstallException):
 
 
 class PipRequirementsException(InstallException):
-    pass
+    def __init__(self, code, stdout, stderr):
+        self.code, self.stdout, self.stderr = code, stdout, stderr
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__, self.__str__()
+                .replace('\n', '\n\t').rstrip('\t')
+        )
+
+    def __str__(self):
+        return '\nPip returned code {}:\n{}\n{}'.format(
+            self.code, self.stdout, self.stderr
+        )
 
 
 class MultipleSkillMatches(MsmException):
@@ -47,7 +59,7 @@ class MultipleSkillMatches(MsmException):
         self.skills = skills
 
     def __repr__(self):
-        return 'MultipleSkillMatches({})'.format(self.__str__())
+        return '{}({})'.format(self.__class__.__name__, self.__str__())
 
     def __str__(self):
         return ', '.join(skill.name for skill in self.skills)

@@ -13,7 +13,7 @@ from git import Repo
 from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
-from subprocess import call, PIPE
+from subprocess import call, PIPE, Popen
 
 from py_msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
@@ -117,7 +117,7 @@ class SkillEntry(object):
         if not exists(requirements_file):
             return False
 
-        LOG.info('Installing requirements.txt')
+        LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK)
         pip_args = [
             sys.executable, '-m', 'pip', 'install', '-r', requirements_file
@@ -127,14 +127,18 @@ class SkillEntry(object):
             if call(['sudo', '-n', 'true'], stderr=PIPE) == 0:
                 pip_args = ['sudo', '-n'] + pip_args
             else:
-                LOG.error('Permission denied while installing pip '
-                          'dependencies. Please run in virtualenv or use sudo')
-                raise PipRequirementsException(2)
+                raise PipRequirementsException(
+                    2, '', 'Permission denied while installing pip '
+                    'dependencies. Please run in virtualenv or use sudo'
+                )
 
-        pip_code = call(pip_args, stdout=PIPE)
+        proc = Popen(pip_args, stdout=PIPE, stderr=PIPE)
+        pip_code = proc.wait()
         if pip_code != 0:
-            LOG.error("Pip code: " + str(pip_code))
-            raise PipRequirementsException(pip_code)
+            raise PipRequirementsException(
+                pip_code, proc.stdout.read().decode(),
+                proc.stderr.read().decode()
+            )
 
         return True
 
