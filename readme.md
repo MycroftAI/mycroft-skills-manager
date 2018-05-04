@@ -36,7 +36,6 @@ msm -b master -p kde default
 
 ## TODO
 
-- Get hashes before git pulling to decide if pip and res.sh should be run
 - Parse readme.md from skills
 
 ## New Features

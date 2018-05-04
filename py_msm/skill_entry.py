@@ -113,7 +113,6 @@ class SkillEntry(object):
         )
 
     def run_pip(self):
-        # TODO check hash before re running
         requirements_file = join(self.path, "requirements.txt")
         if not exists(requirements_file):
             return False
