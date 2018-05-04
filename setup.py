@@ -1,15 +1,15 @@
 from setuptools import setup
 
 setup(
-    name='py_msm',
-    version='0.3.9',
+    name='py-msm',
+    version='0.4.0',
     packages=['py_msm'],
     install_requires=['GitPython'],
-    url='https://github.com/JarbasAl/py_msm',
+    url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='MIT',
-    author='jarbasAI',
-    author_email='jarbasai@mailfence.com',
-    description='Mycroft Skill Manager, in python!',
+    author='jarbasAI, Matthew Scholefield',
+    author_email='jarbasai@mailfence.com, matthew331199@gmail.com',
+    description='Mycroft Skills Manager',
     entry_points={
         'console_scripts': {
             'msm=py_msm.__main__:main'
