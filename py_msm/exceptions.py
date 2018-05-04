@@ -26,6 +26,10 @@ class SkillNotFound(InstallException):
     pass
 
 
+class SkillRequirementsException(InstallException):
+    pass
+
+
 class CloneException(InstallException):
     pass
 

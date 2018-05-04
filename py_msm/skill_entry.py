@@ -15,6 +15,7 @@ from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
 from subprocess import call, PIPE, Popen
 
+from py_msm import SkillRequirementsException
 from py_msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException
@@ -23,12 +24,13 @@ LOG = logging.getLogger(__name__)
 
 
 class SkillEntry(object):
-    def __init__(self, name, path, url='', sha=''):
+    def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
         self.name = name
         self.path = path
-        self.sha = sha
         self.url = url
+        self.sha = sha
+        self.msm = msm
         self.author = self._extract_author(url) if url else ''
         self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
@@ -42,8 +44,8 @@ class SkillEntry(object):
         return self
 
     @classmethod
-    def from_folder(cls, path):
-        return cls(basename(path), path, cls.find_git_url(path))
+    def from_folder(cls, path, msm=None):
+        return cls(basename(path), path, cls.find_git_url(path), msm=msm)
 
     @classmethod
     def create_path(cls, folder, url, name=''):
@@ -155,6 +157,19 @@ class SkillEntry(object):
         LOG.info("Successfully ran requirements.sh for " + self.name)
         return True
 
+    def run_skill_requirements(self):
+        if not self.msm:
+            raise ValueError('Pass msm to SkillEntry to install skill deps')
+        try:
+            for skill_dep in self.get_dependent_skills():
+                LOG.info("Installing skill dependency: {}".format(skill_dep))
+                try:
+                    self.msm.install(skill_dep)
+                except AlreadyInstalled:
+                    pass
+        except Exception as e:
+            raise SkillRequirementsException(e)
+
     def get_dependent_skills(self):
         reqs = join(self.path, "skill_requirements.txt")
         if not exists(reqs):
@@ -167,6 +182,9 @@ class SkillEntry(object):
         if self.is_local:
             raise AlreadyInstalled(self.name)
 
+        if self.msm:
+            self.run_skill_requirements()
+
         LOG.info("Downloading skill: " + self.url)
         try:
             Repo.clone_from(self.url, self.path)
@@ -176,8 +194,9 @@ class SkillEntry(object):
 
         self.run_requirements_sh()
         self.run_pip()
-        LOG.info('Successfully installed ' + self.name)
         self.is_local = True
+
+        LOG.info('Successfully installed ' + self.name)
 
     def update(self):
         git = Git(self.path)

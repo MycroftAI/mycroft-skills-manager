@@ -3,7 +3,6 @@ from __future__ import print_function
 import logging
 from glob import glob
 from itertools import chain
-from threading import Thread
 
 from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname
@@ -30,11 +29,7 @@ class MycroftSkillsManager(object):
 
     def install(self, param, author=None):
         """Install by url or name"""
-        skill = self.find_skill(param, author)
-        skill.install()
-        for skill_dep in skill.get_dependent_skills():
-            LOG.info("Installing skill dependency: {}".format(skill_dep))
-            self.install(skill_dep)
+        self.find_skill(param, author).install()
 
     def remove(self, param, author=None):
         """Remove by url or name"""
@@ -113,7 +108,7 @@ class MycroftSkillsManager(object):
         remote_skill_list = (
             SkillEntry(
                 name, SkillEntry.create_path(self.skills_dir, url, name),
-                url, sha if self.versioned else ''
+                url, sha if self.versioned else '', msm=self
             )
             for name, path, url, sha in self.repo.get_skill_data()
         )
@@ -122,7 +117,7 @@ class MycroftSkillsManager(object):
         }
         all_skills = []
         for skill_file in glob(join(self.skills_dir, '*', '__init__.py')):
-            skill = SkillEntry.from_folder(dirname(skill_file))
+            skill = SkillEntry.from_folder(dirname(skill_file), msm=self)
             if skill.id in remote_skills:
                 skill.attach(remote_skills.pop(skill.id))
             all_skills.append(skill)
@@ -140,7 +135,7 @@ class MycroftSkillsManager(object):
                     return skill
             name = SkillEntry.extract_repo_name(param)
             path = SkillEntry.create_path(self.skills_dir, param)
-            return SkillEntry(name, path, param)
+            return SkillEntry(name, path, param, msm=self)
         else:
             skill_confs = {
                 skill: skill.match(param, author)
