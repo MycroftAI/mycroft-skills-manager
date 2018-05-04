@@ -1,5 +1,9 @@
 class MsmException(Exception):
-    pass
+    def __repr__(self):
+        s = self.__str__().rstrip('\n')
+        if '\n' in s:
+            s = s.replace('\n', '\n\t') + '\n'
+        return '{}({})'.format(self.__class__.__name__, s)
 
 
 class SkillModified(MsmException):
@@ -46,12 +50,6 @@ class PipRequirementsException(InstallException):
     def __init__(self, code, stdout, stderr):
         self.code, self.stdout, self.stderr = code, stdout, stderr
 
-    def __repr__(self):
-        return '{}({})'.format(
-            self.__class__.__name__, self.__str__()
-                .replace('\n', '\n\t').rstrip('\t')
-        )
-
     def __str__(self):
         return '\nPip returned code {}:\n{}\n{}'.format(
             self.code, self.stdout, self.stderr
@@ -61,9 +59,6 @@ class PipRequirementsException(InstallException):
 class MultipleSkillMatches(MsmException):
     def __init__(self, skills):
         self.skills = skills
-
-    def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self.__str__())
 
     def __str__(self):
         return ', '.join(skill.name for skill in self.skills)

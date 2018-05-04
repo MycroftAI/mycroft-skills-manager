@@ -207,7 +207,7 @@ class SkillEntry(object):
             git.fetch()
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
-            raise SkillModified(e.stderr)
+            raise SkillModified(e.stderr.decode())
 
         sha_after = git.rev_parse('HEAD')
 

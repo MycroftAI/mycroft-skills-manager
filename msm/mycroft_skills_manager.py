@@ -63,8 +63,10 @@ class MycroftSkillsManager(object):
                     skill.update()
                 return True
             except MsmException as e:
-                LOG.error('Error installing {}: {}'.format(skill.name,
-                                                           repr(e)))
+                LOG.error('Error {} {}: {}'.format(
+                    'updating' if skill.is_local else 'installing',
+                    skill.name, repr(e)
+                ))
                 return False
         default_skills = chain(*[
             skill_groups.get(i, []) for i in {'default', self.platform}
