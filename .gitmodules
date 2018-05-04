@@ -1,0 +1,14 @@
+[submodule "skill-a"]
+	path = skill-a
+	url = https://github.com/MycroftAI/skill-hello-world
+
+[submodule "skill-b"]
+	path = skill-b
+	url = https://github.com/MycroftAI/skill-ip.git
+
+[submodule "skill-cd"]
+	path = skill-cd
+	url = https://github.com/MycroftAI/skill-joke.git
+[submodule "skill-ce"]
+	path = skill-ce
+	url = https://github.com/MycroftAI/skill-alarm.git
