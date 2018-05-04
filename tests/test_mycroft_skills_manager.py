@@ -22,12 +22,15 @@ class TestMycroftSkillsManager(object):
     def teardown(self):
         if exists(self.msm.skills_dir):
             rmtree(self.msm.skills_dir)
+        if exists(self.msm.repo.path):
+            rmtree(self.msm.repo.path)
 
     def test_install(self):
         """Install by url or name"""
         self.msm.install('skill-a')
         with pytest.raises(AlreadyInstalled):
             self.msm.install('skill-a')
+        self.msm.install('skill-b')
 
     def test_remove(self):
         """Remove by url or name"""

@@ -3,3 +3,4 @@
 *.pyc
 dist/
 .pytest_cache/
+.coverage
