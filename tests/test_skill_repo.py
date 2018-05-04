@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from os import chdir
 from os.path import abspath, dirname, join
 from shutil import rmtree

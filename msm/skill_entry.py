@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import logging
 import subprocess
 from difflib import SequenceMatcher
@@ -9,7 +7,7 @@ import sys
 
 import os
 
-from git import Repo
+from git import Repo, CommandError
 from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
@@ -55,7 +53,7 @@ class SkillEntry(object):
 
     @staticmethod
     def extract_repo_name(url):
-        s = url.split("/")[-1]
+        s = url.rstrip('/').split("/")[-1]
         a, b, c = s.rpartition('.git')
         if not c:
             return a
@@ -63,7 +61,7 @@ class SkillEntry(object):
 
     @staticmethod
     def _extract_author(url):
-        return url.split("/")[-2].split(':')[-1]
+        return url.rstrip('/').split("/")[-2].split(':')[-1]
 
     @classmethod
     def extract_repo_id(cls, url):
@@ -234,7 +232,7 @@ class SkillEntry(object):
         """Get the git url from a folder"""
         try:
             return Git(path).config('remote.origin.url')
-        except GitCommandError:
+        except CommandError:
             return ''
 
     def __repr__(self):
