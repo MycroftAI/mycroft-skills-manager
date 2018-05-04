@@ -38,7 +38,7 @@ class SkillRepo(object):
             raise MsmException('Invalid branch: ' + self.branch)
 
     def get_skill_data(self):
-        """ generates tuples of name, path, url """
+        """ generates tuples of name, path, url, sha """
         path_to_sha = {
             folder: sha for folder, sha in self.get_shas()
         }
@@ -56,6 +56,8 @@ class SkillRepo(object):
         git = Git(self.path)
         for line in git.ls_tree('origin/' + self.branch).split('\n'):
             size, typ, sha, folder = line.split()
+            if typ != 'commit':
+                continue
             yield folder, sha
 
     def get_default_skill_names(self):
