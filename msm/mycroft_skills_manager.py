@@ -3,9 +3,10 @@ from glob import glob
 from itertools import chain
 
 from multiprocessing.pool import ThreadPool
-from os.path import expanduser, join, dirname
+from os.path import expanduser, join, dirname, isdir
 from typing import Dict, List
 
+from msm import GitException
 from msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
@@ -35,44 +36,30 @@ class MycroftSkillsManager(object):
 
     def update(self):
         """Update all downloaded skills"""
-        def run_update(skill):
+        local_skills = [skill for skill in self.list() if skill.is_local]
+        return self.apply(lambda x: x.update(), local_skills)
+
+    def apply(self, func, skills):
+        """Run a function on all skills in parallel"""
+        def run_item(skill):
             try:
-                skill.update()
+                func(skill)
                 return True
             except MsmException as e:
-                LOG.error('Error updating {}: {}'.format(skill, repr(e)))
+                LOG.error('Error running {} on {}: {}'.format(
+                    func.__name__, skill.name, repr(e)
+                ))
                 return False
-
-        local_skills = [skill for skill in self.list() if skill.is_local]
-        return all(ThreadPool().map(run_update, local_skills))
+        return all(ThreadPool(100).map(run_item, skills))
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
-        skill_groups = self.get_defaults()
+        return self.apply(
+            lambda x: x.update() if x.is_local else x.install(),
+            self.list_defaults()
+        )
 
-        if self.platform not in skill_groups:
-            LOG.error('Unknown platform:' + self.platform)
-
-        def install_default(skill):
-            try:
-                if not skill.is_local:
-                    skill.install()
-                else:
-                    skill.update()
-                return True
-            except MsmException as e:
-                LOG.error('Error {} {}: {}'.format(
-                    'updating' if skill.is_local else 'installing',
-                    skill.name, repr(e)
-                ))
-                return False
-        default_skills = chain(*[
-            skill_groups.get(i, []) for i in {'default', self.platform}
-        ])
-
-        return all(ThreadPool().map(install_default, default_skills))
-
-    def get_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
+    def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""
         self.repo.update()
         skills = self.list()
@@ -90,6 +77,15 @@ class MycroftSkillsManager(object):
 
         return defaults
 
+    def list_defaults(self):
+        skill_groups = self.list_all_defaults()
+
+        if self.platform not in skill_groups:
+            LOG.error('Unknown platform:' + self.platform)
+        return chain(*[
+            skill_groups.get(i, []) for i in {'default', self.platform}
+        ])
+
     def list(self):
         """
         Load a list of SkillEntry objects from both local and
@@ -100,7 +96,12 @@ class MycroftSkillsManager(object):
         in the repo and remote skills with any custom path that they
         have been downloaded to
         """
-        self.repo.update()
+        try:
+            self.repo.update()
+        except GitException as e:
+            if not isdir(self.repo.path):
+                raise
+            LOG.warning('Failed to update repo: {}'.format(repr(e)))
         remote_skill_list = (
             SkillEntry(
                 name, SkillEntry.create_path(self.skills_dir, url, name),

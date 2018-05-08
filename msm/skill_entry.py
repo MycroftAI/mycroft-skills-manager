@@ -13,7 +13,7 @@ from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
 from subprocess import call, PIPE, Popen
 
-from msm import SkillRequirementsException
+from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException
@@ -186,20 +186,21 @@ class SkillEntry(object):
         LOG.info("Downloading skill: " + self.url)
         try:
             Repo.clone_from(self.url, self.path)
+            self.is_local = True
             Git(self.path).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
             raise CloneException(str(e))
 
         self.run_requirements_sh()
         self.run_pip()
-        self.is_local = True
 
         LOG.info('Successfully installed ' + self.name)
 
     def update(self):
         git = Git(self.path)
 
-        sha_before = git.rev_parse('HEAD')
+        with git_to_msm_exceptions():
+            sha_before = git.rev_parse('HEAD')
 
         try:
             git.fetch()

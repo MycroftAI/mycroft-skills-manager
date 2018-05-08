@@ -6,6 +6,7 @@ from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, isdir, dirname, basename
 
+from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
 
 
@@ -27,9 +28,10 @@ class SkillRepo(object):
         if not isdir(self.path):
             Repo.clone_from(self.url, self.path)
 
-        git = Git(self.path)
-        git.config('remote.origin.url', self.url)
-        git.fetch()
+        with git_to_msm_exceptions():
+            git = Git(self.path)
+            git.config('remote.origin.url', self.url)
+            git.fetch()
         try:
             git.reset('origin/' + self.branch, hard=True)
         except GitCommandError:
@@ -52,7 +54,9 @@ class SkillRepo(object):
 
     def get_shas(self):
         git = Git(self.path)
-        for line in git.ls_tree('origin/' + self.branch).split('\n'):
+        with git_to_msm_exceptions():
+            shas = git.ls_tree('origin/' + self.branch)
+        for line in shas.split('\n'):
             size, typ, sha, folder = line.split()
             if typ != 'commit':
                 continue

@@ -1,9 +1,19 @@
+from contextlib import contextmanager
+from future.utils import raise_from
+
+from git import CommandError
+
+
 class MsmException(Exception):
     def __repr__(self):
         s = self.__str__().rstrip('\n')
         if '\n' in s:
             s = s.replace('\n', '\n\t') + '\n'
         return '{}({})'.format(self.__class__.__name__, s)
+
+
+class GitException(MsmException):
+    pass
 
 
 class SkillModified(MsmException):
@@ -62,3 +72,11 @@ class MultipleSkillMatches(MsmException):
 
     def __str__(self):
         return ', '.join(skill.name for skill in self.skills)
+
+
+@contextmanager
+def git_to_msm_exceptions():
+    try:
+        yield
+    except CommandError as e:
+        raise_from(GitException('Git command failed: {}'.format(repr(e))), e)
