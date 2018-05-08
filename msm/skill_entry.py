@@ -196,6 +196,12 @@ class SkillEntry(object):
 
         LOG.info('Successfully installed ' + self.name)
 
+    def update_deps(self):
+        if self.msm:
+            self.run_skill_requirements()
+        self.run_requirements_sh()
+        self.run_pip()
+
     def update(self):
         git = Git(self.path)
 
@@ -211,8 +217,7 @@ class SkillEntry(object):
         sha_after = git.rev_parse('HEAD')
 
         if sha_before != sha_after:
-            self.run_requirements_sh()
-            self.run_pip()
+            self.update_deps()
             LOG.info('Updated ' + self.name)
         else:
             LOG.info('Nothing new for ' + self.name)
