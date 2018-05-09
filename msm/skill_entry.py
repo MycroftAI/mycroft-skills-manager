@@ -189,7 +189,7 @@ class SkillEntry(object):
             self.is_local = True
             Git(self.path).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
-            raise CloneException(str(e))
+            raise CloneException(e.stderr)
 
         self.run_requirements_sh()
         self.run_pip()
@@ -212,7 +212,7 @@ class SkillEntry(object):
             git.fetch()
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
-            raise SkillModified(e.stderr.decode())
+            raise SkillModified(e.stderr)
 
         sha_after = git.rev_parse('HEAD')
 

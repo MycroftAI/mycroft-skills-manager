@@ -6,7 +6,7 @@ from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname, isdir
 from typing import Dict, List
 
-from msm import GitException
+from msm import GitException, SkillModified
 from msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
@@ -37,7 +37,10 @@ class MycroftSkillsManager(object):
     def update(self):
         """Update all downloaded skills"""
         local_skills = [skill for skill in self.list() if skill.is_local]
-        return self.apply(lambda x: x.update(), local_skills)
+
+        def update_skill(skill):
+            skill.update()
+        return self.apply(update_skill, local_skills)
 
     def apply(self, func, skills):
         """Run a function on all skills in parallel"""
@@ -54,10 +57,12 @@ class MycroftSkillsManager(object):
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
-        return self.apply(
-            lambda x: x.update() if x.is_local else x.install(),
-            self.list_defaults()
-        )
+        def install_or_update_skill(skill):
+            if skill.is_local:
+                skill.update()
+            else:
+                skill.install()
+        return self.apply(install_or_update_skill, self.list_defaults())
 
     def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""
