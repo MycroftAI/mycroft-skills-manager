@@ -74,7 +74,7 @@ class SkillEntry(object):
 
     @staticmethod
     def _extract_tokens(s, tokens):
-        s = s.lower().replace('-', '')
+        s = s.lower().replace('-', ' ')
         extracted = []
         for token in tokens:
             extracted += [token] * s.count(token)
@@ -89,11 +89,11 @@ class SkillEntry(object):
 
     def match(self, query, author=None):
         search, search_tokens, search_common = self._extract_tokens(
-            query.lower(), ['skill', 'fallback', 'mycroft']
+            query, ['skill', 'fallback', 'mycroft']
         )
 
         name, name_tokens, name_common = self._extract_tokens(
-            self.name.lower(), ['skill', 'fallback', 'mycroft']
+            self.name, ['skill', 'fallback', 'mycroft']
         )
 
         weights = [

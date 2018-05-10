@@ -6,7 +6,7 @@ from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname, isdir
 from typing import Dict, List
 
-from msm import GitException, SkillModified
+from msm import GitException
 from msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
