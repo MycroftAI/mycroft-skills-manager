@@ -118,26 +118,25 @@ class SkillEntry(object):
             return False
 
         LOG.info('Installing requirements.txt for ' + self.name)
-        can_pip = os.access(dirname(sys.executable), os.W_OK)
+        can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
         pip_args = [
             sys.executable, '-m', 'pip', 'install', '-r', requirements_file
         ]
 
         if not can_pip:
-            if call(['sudo', '-n', 'true'], stderr=PIPE) == 0:
-                pip_args = ['sudo', '-n'] + pip_args
-            else:
-                raise PipRequirementsException(
-                    2, '', 'Permission denied while installing pip '
-                    'dependencies. Please run in virtualenv or use sudo'
-                )
+            pip_args = ['sudo', '-n'] + pip_args
 
         proc = Popen(pip_args, stdout=PIPE, stderr=PIPE)
         pip_code = proc.wait()
         if pip_code != 0:
+            stderr = proc.stderr.read().decode()
+            if pip_code == 1 and 'sudo:' in stderr and pip_args[0] == 'sudo':
+                raise PipRequirementsException(
+                    2, '', 'Permission denied while installing pip '
+                    'dependencies. Please run in virtualenv or use sudo'
+                )
             raise PipRequirementsException(
-                pip_code, proc.stdout.read().decode(),
-                proc.stderr.read().decode()
+                pip_code, proc.stdout.read().decode(), stderr
             )
 
         return True
