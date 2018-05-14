@@ -146,7 +146,6 @@ class SkillEntry(object):
         if not exists(setup_script):
             return False
 
-        subprocess.call(["chmod", "+x", setup_script])
         rc = subprocess.call(["bash", setup_script])
         if rc != 0:
             LOG.error("Requirements.sh failed with error code: " + str(rc))
