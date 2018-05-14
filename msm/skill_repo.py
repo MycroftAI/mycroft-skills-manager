@@ -65,10 +65,10 @@ class SkillRepo(object):
     def get_default_skill_names(self):
         for defaults_file in glob(join(self.path, 'DEFAULT-SKILLS*')):
             with open(defaults_file) as f:
-                skills = filter(
+                skills = list(filter(
                     lambda x: x and not x.startswith('#'),
                     map(str.strip, f.read().split('\n'))
-                )
+                ))
             platform = basename(defaults_file).replace('DEFAULT-SKILLS', '')
             platform = platform.replace('.', '') or 'default'
             yield platform, skills
