@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from future.utils import raise_from
 
-from git import CommandError
+from git import GitError
 
 
 class MsmException(Exception):
@@ -78,5 +78,5 @@ class MultipleSkillMatches(MsmException):
 def git_to_msm_exceptions():
     try:
         yield
-    except CommandError as e:
+    except GitError as e:
         raise_from(GitException('Git command failed: {}'.format(repr(e))), e)

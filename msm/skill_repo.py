@@ -25,13 +25,14 @@ class SkillRepo(object):
         if not exists(dirname(self.path)):
             makedirs(dirname(self.path))
 
-        if not isdir(self.path):
-            Repo.clone_from(self.url, self.path)
-
         with git_to_msm_exceptions():
+            if not isdir(self.path):
+                Repo.clone_from(self.url, self.path)
+
             git = Git(self.path)
             git.config('remote.origin.url', self.url)
             git.fetch()
+
         try:
             git.reset('origin/' + self.branch, hard=True)
         except GitCommandError:

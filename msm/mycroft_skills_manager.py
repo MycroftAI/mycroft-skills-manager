@@ -70,7 +70,6 @@ class MycroftSkillsManager(object):
 
     def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""
-        self.repo.update()
         skills = self.list()
         name_to_skill = {skill.name: skill for skill in skills}
         defaults = {group: [] for group in self.SKILL_GROUPS}
@@ -134,7 +133,6 @@ class MycroftSkillsManager(object):
         # type: (str, str, List[SkillEntry]) -> SkillEntry
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
-            self.repo.update()
             repo_id = SkillEntry.extract_repo_id(param)
             for skill in self.list():
                 if skill.id == repo_id:

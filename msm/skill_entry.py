@@ -7,7 +7,7 @@ import sys
 
 import os
 
-from git import Repo, CommandError
+from git import Repo, GitError
 from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
@@ -236,7 +236,7 @@ class SkillEntry(object):
         """Get the git url from a folder"""
         try:
             return Git(path).config('remote.origin.url')
-        except CommandError:
+        except GitError:
             return ''
 
     def __repr__(self):
