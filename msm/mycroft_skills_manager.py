@@ -53,6 +53,10 @@ class MycroftSkillsManager(object):
                     func.__name__, skill.name, repr(e)
                 ))
                 return False
+            except:
+                LOG.exception('Error running {} on {}:'.format(
+                    func.__name__, skill.name
+                ))
         return all(ThreadPool(100).map(run_item, skills))
 
     def install_defaults(self):
