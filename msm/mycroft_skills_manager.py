@@ -57,7 +57,8 @@ class MycroftSkillsManager(object):
                 LOG.exception('Error running {} on {}:'.format(
                     func.__name__, skill.name
                 ))
-        return all(ThreadPool(100).map(run_item, skills))
+        with ThreadPool(100) as tp:
+            return all(tp.map(run_item, skills))
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
