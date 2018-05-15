@@ -49,7 +49,7 @@ class SkillEntry(object):
     def create_path(cls, folder, url, name=''):
         return join(folder, '{}.{}'.format(
             name or cls.extract_repo_name(url), cls._extract_author(url)
-        ))
+        ).lower())
 
     @staticmethod
     def extract_repo_name(url):
@@ -65,7 +65,7 @@ class SkillEntry(object):
 
     @classmethod
     def extract_repo_id(cls, url):
-        return '{}:{}'.format(cls._extract_author(url),
+        return '{}:{}'.format(cls._extract_author(url).lower(),
                               cls.extract_repo_name(url)).lower()
 
     @staticmethod
