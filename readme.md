@@ -4,7 +4,7 @@ Mycroft Skill Manager, in python!
 
 ## Install
 
-    pip install py_msm
+    pip install msm
 
 ## Usage
 
