@@ -226,7 +226,7 @@ class SkillEntry(object):
 
             git.fetch()
             current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
-            if current_branch in SWITCHABLE_BRANCHES:
+            if self.sha and current_branch in SWITCHABLE_BRANCHES:
                 # Check out correct branch
                 git.checkout(self._find_sha_branch())
 
