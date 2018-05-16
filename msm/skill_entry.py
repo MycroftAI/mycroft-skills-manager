@@ -20,9 +20,9 @@ from msm.exceptions import PipRequirementsException, \
 
 LOG = logging.getLogger(__name__)
 
-# Branches which can be updated from despite non-fastforward
+# Branches which can be switched from when updating
 # TODO Make this configurable
-UNSAFE_BRANCHES = ['master']
+SWITCHABLE_BRANCHES = ['master']
 
 
 class SkillEntry(object):
@@ -226,7 +226,7 @@ class SkillEntry(object):
 
             git.fetch()
             current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
-            if current_branch in UNSAFE_BRANCHES:
+            if current_branch in SWITCHABLE_BRANCHES:
                 # Check out correct branch
                 git.checkout(self._find_sha_branch())
 
