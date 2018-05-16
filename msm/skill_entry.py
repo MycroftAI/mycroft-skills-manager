@@ -220,19 +220,17 @@ class SkillEntry(object):
         with git_to_msm_exceptions():
             sha_before = git.rev_parse('HEAD')
 
-        try:
+            modified_files = git.status(porcelain=True, untracked='no')
+            if modified_files != '':
+                raise SkillModified('Uncommitted changes:\n' + modified_files)
+
             git.fetch()
             current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
             if current_branch in UNSAFE_BRANCHES:
-                # Make sure there's no modifications to tracked files
-                if git.status(porcelain=True, untracked='no') != '':
-                    raise SkillModified('Uncommitted changes, aborting')
                 # Check out correct branch
                 git.checkout(self._find_sha_branch())
 
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
-        except GitCommandError as e:
-            raise SkillModified(e.stderr)
 
         sha_after = git.rev_parse('HEAD')
 
