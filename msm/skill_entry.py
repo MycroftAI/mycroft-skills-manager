@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 # TODO Make this configurable
 UNSAFE_BRANCHES = ['master']
 
+
 class SkillEntry(object):
     def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
@@ -203,6 +204,16 @@ class SkillEntry(object):
         self.run_requirements_sh()
         self.run_pip()
 
+    def _find_sha_branch(self):
+        git = Git(self.path)
+        sha_branch = git.branch(
+            contains=self.sha, all=True
+        ).split('\n')[0]
+        sha_branch = sha_branch.strip('* \n').replace('remotes/', '')
+        for remote in git.remote().split('\n'):
+            sha_branch = sha_branch.replace(remote + '/', '')
+        return sha_branch
+
     def update(self):
         git = Git(self.path)
 
@@ -217,12 +228,7 @@ class SkillEntry(object):
                 if git.status(porcelain=True, untracked='no') != '':
                     raise SkillModified('Uncommitted changes, aborting')
                 # Check out correct branch
-                sha_branch = git.branch(contains=self.sha).split('\n')[0]
-                sha_branch = sha_branch[1:].strip()
-                git.checkout(sha_branch)
-                # Reset to common ancestor to make the merge work OK
-                common_sha = git.merge_base(sha_before, self.sha)
-                git.reset(common_sha, hard=True)
+                git.checkout(self._find_sha_branch())
 
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
