@@ -20,6 +20,9 @@ from msm.exceptions import PipRequirementsException, \
 
 LOG = logging.getLogger(__name__)
 
+# Branches which can be updated from despite non-fastforward
+# TODO Make this configurable
+UNSAFE_BRANCHES = ['master']
 
 class SkillEntry(object):
     def __init__(self, name, path, url='', sha='', msm=None):
@@ -208,6 +211,19 @@ class SkillEntry(object):
 
         try:
             git.fetch()
+            current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
+            if current_branch in UNSAFE_BRANCHES:
+                # Make sure there's no modifications to tracked files
+                if git.status(porcelain=True, untracked='no') != '':
+                    raise SkillModified('Uncommitted changes, aborting')
+                # Check out correct branch
+                sha_branch = git.branch(contains=self.sha).split('\n')[0]
+                sha_branch = sha_branch[1:].strip()
+                git.checkout(sha_branch)
+                # Reset to common ancestor to make the merge work OK
+                common_sha = git.merge_base(sha_before, self.sha)
+                git.reset(common_sha, hard=True)
+
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
         except GitCommandError as e:
             raise SkillModified(e.stderr)
