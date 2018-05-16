@@ -20,6 +20,10 @@ from msm.exceptions import PipRequirementsException, \
 
 LOG = logging.getLogger(__name__)
 
+# Branches which can be switched from when updating
+# TODO Make this configurable
+SWITCHABLE_BRANCHES = ['master']
+
 
 class SkillEntry(object):
     def __init__(self, name, path, url='', sha='', msm=None):
@@ -200,17 +204,33 @@ class SkillEntry(object):
         self.run_requirements_sh()
         self.run_pip()
 
+    def _find_sha_branch(self):
+        git = Git(self.path)
+        sha_branch = git.branch(
+            contains=self.sha, all=True
+        ).split('\n')[0]
+        sha_branch = sha_branch.strip('* \n').replace('remotes/', '')
+        for remote in git.remote().split('\n'):
+            sha_branch = sha_branch.replace(remote + '/', '')
+        return sha_branch
+
     def update(self):
         git = Git(self.path)
 
         with git_to_msm_exceptions():
             sha_before = git.rev_parse('HEAD')
 
-        try:
+            modified_files = git.status(porcelain=True, untracked='no')
+            if modified_files != '':
+                raise SkillModified('Uncommitted changes:\n' + modified_files)
+
             git.fetch()
+            current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
+            if self.sha and current_branch in SWITCHABLE_BRANCHES:
+                # Check out correct branch
+                git.checkout(self._find_sha_branch())
+
             git.merge(self.sha or 'origin/HEAD', ff_only=True)
-        except GitCommandError as e:
-            raise SkillModified(e.stderr)
 
         sha_after = git.rev_parse('HEAD')
 
