@@ -256,6 +256,8 @@ class SkillEntry(object):
         if sha_before != sha_after:
             self.update_deps()
             LOG.info('Updated ' + self.name)
+            # Trigger reload by modifying the timestamp
+            os.utime(join(self.path, '__init__.py'))
         else:
             LOG.info('Nothing new for ' + self.name)
 
