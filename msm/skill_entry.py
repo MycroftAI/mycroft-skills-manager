@@ -1,7 +1,7 @@
 import logging
 import subprocess
 from difflib import SequenceMatcher
-from shutil import rmtree
+from shutil import rmtree, move
 from contextlib import contextmanager
 
 import sys
@@ -209,16 +209,16 @@ class SkillEntry(object):
             raise CloneException(e.stderr)
 
         if isfile(join(tmp_location, '__init__.py')):
-            os.rename(join(tmp_location, '__init__.py'),
-                      join(tmp_location, '__init__'))
-        os.rename(tmp_location, self.path)
+            move(join(tmp_location, '__init__.py'),
+                 join(tmp_location, '__init__'))
+        move(tmp_location, self.path)
 
         self.run_requirements_sh()
         self.run_pip()
 
         if isfile(join(self.path, '__init__')):
-            os.rename(join(self.path, '__init__'),
-                      join(self.path, '__init__.py'))
+            move(join(self.path, '__init__'),
+                 join(self.path, '__init__.py'))
 
         LOG.info('Successfully installed ' + self.name)
 
