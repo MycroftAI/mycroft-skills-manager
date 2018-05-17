@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import sys
 
 import os
+from threading import Lock
 
 from git import Repo, GitError
 from git.cmd import Git
@@ -38,6 +39,8 @@ def work_dir(directory):
 
 
 class SkillEntry(object):
+    pip_lock = Lock()
+
     def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
         self.name = name
@@ -142,8 +145,9 @@ class SkillEntry(object):
         if not can_pip:
             pip_args = ['sudo', '-n'] + pip_args
 
-        proc = Popen(pip_args, stdout=PIPE, stderr=PIPE)
-        pip_code = proc.wait()
+        with self.pip_lock:
+            proc = Popen(pip_args, stdout=PIPE, stderr=PIPE)
+            pip_code = proc.wait()
         if pip_code != 0:
             stderr = proc.stderr.read().decode()
             if pip_code == 1 and 'sudo:' in stderr and pip_args[0] == 'sudo':
