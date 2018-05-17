@@ -1,7 +1,7 @@
 import logging
 import subprocess
 from difflib import SequenceMatcher
-from shutil import rmtree
+from shutil import rmtree, move
 from contextlib import contextmanager
 
 import sys
@@ -11,8 +11,9 @@ import os
 from git import Repo, GitError
 from git.cmd import Git
 from git.exc import GitCommandError
-from os.path import exists, join, basename, dirname
+from os.path import exists, join, basename, dirname, isfile
 from subprocess import call, PIPE, Popen
+from tempfile import mktemp
 
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
@@ -200,14 +201,26 @@ class SkillEntry(object):
 
         LOG.info("Downloading skill: " + self.url)
         try:
-            Repo.clone_from(self.url, self.path)
+            tmp_location = mktemp()
+            Repo.clone_from(self.url, tmp_location)
             self.is_local = True
-            Git(self.path).reset(self.sha or 'HEAD', hard=True)
+            Git(tmp_location).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
             raise CloneException(e.stderr)
 
-        self.run_requirements_sh()
-        self.run_pip()
+        if isfile(join(tmp_location, '__init__.py')):
+            move(join(tmp_location, '__init__.py'),
+                 join(tmp_location, '__init__'))
+
+        try:
+            move(tmp_location, self.path)
+
+            self.run_requirements_sh()
+            self.run_pip()
+        finally:
+            if isfile(join(self.path, '__init__')):
+                move(join(self.path, '__init__'),
+                     join(self.path, '__init__.py'))
 
         LOG.info('Successfully installed ' + self.name)
 
@@ -250,6 +263,8 @@ class SkillEntry(object):
         if sha_before != sha_after:
             self.update_deps()
             LOG.info('Updated ' + self.name)
+            # Trigger reload by modifying the timestamp
+            os.utime(join(self.path, '__init__.py'))
         else:
             LOG.info('Nothing new for ' + self.name)
 
