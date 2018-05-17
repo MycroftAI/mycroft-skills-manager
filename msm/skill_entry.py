@@ -13,6 +13,7 @@ from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname
 from subprocess import call, PIPE, Popen
+from tempfile import mktemp
 
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
@@ -200,15 +201,20 @@ class SkillEntry(object):
 
         LOG.info("Downloading skill: " + self.url)
         try:
-            Repo.clone_from(self.url, self.path)
+            tmp_location = mktemp()
+            Repo.clone_from(self.url, tmp_location)
             self.is_local = True
-            Git(self.path).reset(self.sha or 'HEAD', hard=True)
+            Git(tmp_location).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
             raise CloneException(e.stderr)
-
+        os.rename(join(tmp_location, '__init__.py'),
+                  join(tmp_location, '__init__'))
+        os.rename(tmp_location, self.path)
         self.run_requirements_sh()
         self.run_pip()
 
+        os.rename(join(self.path, '__init__'),
+                  join(self.path, '__init__.py'))
         LOG.info('Successfully installed ' + self.name)
 
     def update_deps(self):
