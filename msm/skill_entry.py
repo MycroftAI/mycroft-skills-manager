@@ -211,14 +211,16 @@ class SkillEntry(object):
         if isfile(join(tmp_location, '__init__.py')):
             move(join(tmp_location, '__init__.py'),
                  join(tmp_location, '__init__'))
-        move(tmp_location, self.path)
 
-        self.run_requirements_sh()
-        self.run_pip()
+        try:
+            move(tmp_location, self.path)
 
-        if isfile(join(self.path, '__init__')):
-            move(join(self.path, '__init__'),
-                 join(self.path, '__init__.py'))
+            self.run_requirements_sh()
+            self.run_pip()
+        finally:
+            if isfile(join(self.path, '__init__')):
+                move(join(self.path, '__init__'),
+                     join(self.path, '__init__.py'))
 
         LOG.info('Successfully installed ' + self.name)
 
