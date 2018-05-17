@@ -2,6 +2,7 @@ import logging
 import subprocess
 from difflib import SequenceMatcher
 from shutil import rmtree
+from contextlib import contextmanager
 
 import sys
 
@@ -23,6 +24,16 @@ LOG = logging.getLogger(__name__)
 # Branches which can be switched from when updating
 # TODO Make this configurable
 SWITCHABLE_BRANCHES = ['master']
+
+
+@contextmanager
+def work_dir(directory):
+    old_dir = os.getcwd()
+    os.chdir(directory)
+    try:
+        yield
+    finally:
+        os.chdir(old_dir)
 
 
 class SkillEntry(object):
@@ -150,7 +161,9 @@ class SkillEntry(object):
         if not exists(setup_script):
             return False
 
-        rc = subprocess.call(["bash", setup_script])
+        with work_dir(self.path):
+            rc = subprocess.call(["bash", setup_script])
+
         if rc != 0:
             LOG.error("Requirements.sh failed with error code: " + str(rc))
             raise SystemRequirementsException(rc)
