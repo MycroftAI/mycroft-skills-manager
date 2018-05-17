@@ -11,7 +11,7 @@ import os
 from git import Repo, GitError
 from git.cmd import Git
 from git.exc import GitCommandError
-from os.path import exists, join, basename, dirname
+from os.path import exists, join, basename, dirname, isfile
 from subprocess import call, PIPE, Popen
 from tempfile import mktemp
 
@@ -207,14 +207,19 @@ class SkillEntry(object):
             Git(tmp_location).reset(self.sha or 'HEAD', hard=True)
         except GitCommandError as e:
             raise CloneException(e.stderr)
-        os.rename(join(tmp_location, '__init__.py'),
-                  join(tmp_location, '__init__'))
+
+        if isfile(join(tmp_location, '__init__.py')):
+            os.rename(join(tmp_location, '__init__.py'),
+                      join(tmp_location, '__init__'))
         os.rename(tmp_location, self.path)
+
         self.run_requirements_sh()
         self.run_pip()
 
-        os.rename(join(self.path, '__init__'),
-                  join(self.path, '__init__.py'))
+        if isfile(join(self.path, '__init__')):
+            os.rename(join(self.path, '__init__'),
+                      join(self.path, '__init__.py'))
+
         LOG.info('Successfully installed ' + self.name)
 
     def update_deps(self):
