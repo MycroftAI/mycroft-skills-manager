@@ -13,7 +13,7 @@ from git import Repo, GitError
 from git.cmd import Git
 from git.exc import GitCommandError
 from os.path import exists, join, basename, dirname, isfile
-from subprocess import call, PIPE, Popen
+from subprocess import PIPE, Popen
 from tempfile import mktemp
 
 from msm import SkillRequirementsException, git_to_msm_exceptions

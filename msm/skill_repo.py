@@ -34,6 +34,7 @@ class SkillRepo(object):
             git.fetch()
 
         try:
+            git.checkout(self.branch)
             git.reset('origin/' + self.branch, hard=True)
         except GitCommandError:
             raise MsmException('Invalid branch: ' + self.branch)
