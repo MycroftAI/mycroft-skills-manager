@@ -236,9 +236,10 @@ class SkillEntry(object):
 
     def _find_sha_branch(self):
         git = Git(self.path)
-        sha_branch = git.branch(
+        sha_branches = git.branch(
             contains=self.sha, all=True
-        ).split('\n')[0]
+        ).split('\n')
+        sha_branch = [b for b in sha_branches if ' -> ' not in b][0]
         sha_branch = sha_branch.strip('* \n').replace('remotes/', '')
         for remote in git.remote().split('\n'):
             sha_branch = sha_branch.replace(remote + '/', '')
