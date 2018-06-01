@@ -22,9 +22,9 @@
 import logging
 from glob import glob
 from itertools import chain
-
 from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname, isdir
+
 from typing import Dict, List
 
 from msm import GitException
@@ -43,7 +43,7 @@ class MycroftSkillsManager(object):
                  versioned=True):
         self.platform = platform
         self.skills_dir = expanduser(skills_dir or '') \
-            or self.DEFAULT_SKILLS_DIR
+                          or self.DEFAULT_SKILLS_DIR
         self.repo = repo or SkillRepo()
         self.versioned = versioned
 
@@ -61,10 +61,12 @@ class MycroftSkillsManager(object):
 
         def update_skill(skill):
             skill.update()
+
         return self.apply(update_skill, local_skills)
 
     def apply(self, func, skills):
         """Run a function on all skills in parallel"""
+
         def run_item(skill):
             try:
                 func(skill)
@@ -78,16 +80,19 @@ class MycroftSkillsManager(object):
                 LOG.exception('Error running {} on {}:'.format(
                     func.__name__, skill.name
                 ))
+
         with ThreadPool(100) as tp:
             return all(tp.map(run_item, skills))
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
+
         def install_or_update_skill(skill):
             if skill.is_local:
                 skill.update()
             else:
                 skill.install()
+
         return self.apply(install_or_update_skill, self.list_defaults())
 
     def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]

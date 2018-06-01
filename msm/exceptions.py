@@ -20,8 +20,8 @@
 # specific language governing permissions and limitations
 # under the License.
 from contextlib import contextmanager
-from future.utils import raise_from
 
+from future.utils import raise_from
 from git import GitError
 
 

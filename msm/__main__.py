@@ -22,9 +22,8 @@
 from __future__ import print_function
 
 import logging
-from logging import ERROR, INFO
-
 import sys
+from logging import ERROR, INFO
 
 from msm.exceptions import MsmException
 from msm.mycroft_skills_manager import MycroftSkillsManager

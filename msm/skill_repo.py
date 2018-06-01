@@ -21,11 +21,11 @@
 # under the License.
 from glob import glob
 from os import makedirs
+from os.path import exists, join, isdir, dirname, basename
 
 from git import Repo
 from git.cmd import Git
 from git.exc import GitCommandError
-from os.path import exists, join, isdir, dirname, basename
 
 from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException

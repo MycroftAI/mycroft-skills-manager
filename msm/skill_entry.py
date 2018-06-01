@@ -20,22 +20,20 @@
 # specific language governing permissions and limitations
 # under the License.
 import logging
-import subprocess
-from difflib import SequenceMatcher
-from shutil import rmtree, move
-from contextlib import contextmanager
-
-import sys
-
 import os
-from threading import Lock
+import subprocess
+import sys
+from contextlib import contextmanager
+from difflib import SequenceMatcher
+from os.path import exists, join, basename, dirname, isfile
+from shutil import rmtree, move
+from subprocess import PIPE, Popen
+from tempfile import mktemp
 
 from git import Repo, GitError
 from git.cmd import Git
 from git.exc import GitCommandError
-from os.path import exists, join, basename, dirname, isfile
-from subprocess import PIPE, Popen
-from tempfile import mktemp
+from threading import Lock
 
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
@@ -174,7 +172,7 @@ class SkillEntry(object):
             if pip_code == 1 and 'sudo:' in stderr and pip_args[0] == 'sudo':
                 raise PipRequirementsException(
                     2, '', 'Permission denied while installing pip '
-                    'dependencies. Please run in virtualenv or use sudo'
+                           'dependencies. Please run in virtualenv or use sudo'
                 )
             raise PipRequirementsException(
                 pip_code, proc.stdout.read().decode(), stderr
