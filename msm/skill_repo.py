@@ -24,11 +24,11 @@ from os import makedirs
 from os.path import exists, join, isdir, dirname, basename
 
 from git import Repo
-from git.cmd import Git
 from git.exc import GitCommandError
 
 from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
+from msm.util import Git
 
 
 class SkillRepo(object):

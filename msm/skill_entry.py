@@ -31,7 +31,6 @@ from subprocess import PIPE, Popen
 from tempfile import mktemp
 
 from git import Repo, GitError
-from git.cmd import Git
 from git.exc import GitCommandError
 from threading import Lock
 
@@ -39,6 +38,7 @@ from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException
+from msm.util import Git
 
 LOG = logging.getLogger(__name__)
 
