@@ -67,7 +67,7 @@ class SkillEntry(object):
         self.url = url
         self.sha = sha
         self.msm = msm
-        self.author = self._extract_author(url) if url else ''
+        self.author = self.extract_author(url) if url else ''
         self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
 
@@ -86,7 +86,7 @@ class SkillEntry(object):
     @classmethod
     def create_path(cls, folder, url, name=''):
         return join(folder, '{}.{}'.format(
-            name or cls.extract_repo_name(url), cls._extract_author(url)
+            name or cls.extract_repo_name(url), cls.extract_author(url)
         ).lower())
 
     @staticmethod
@@ -98,12 +98,12 @@ class SkillEntry(object):
         return s
 
     @staticmethod
-    def _extract_author(url):
+    def extract_author(url):
         return url.rstrip('/').split("/")[-2].split(':')[-1]
 
     @classmethod
     def extract_repo_id(cls, url):
-        return '{}:{}'.format(cls._extract_author(url).lower(),
+        return '{}:{}'.format(cls.extract_author(url).lower(),
                               cls.extract_repo_name(url)).lower()
 
     @staticmethod
