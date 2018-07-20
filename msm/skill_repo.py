@@ -29,6 +29,9 @@ from git.exc import GitCommandError
 from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
 from msm.util import Git
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 class SkillRepo(object):
@@ -66,14 +69,19 @@ class SkillRepo(object):
             folder: sha for folder, sha in self.get_shas()
         }
         modules = self.read_file('.gitmodules').split('[submodule "')
-        for module in modules:
+        for i, module in enumerate(modules):
             if not module:
                 continue
-            name = module.split('"]')[0].strip()
-            path = module.split('path = ')[1].split('\n')[0].strip()
-            url = module.split('url = ')[1].strip()
-            sha = path_to_sha.get(path, '')
-            yield name, path, url, sha
+            try:
+                name = module.split('"]')[0].strip()
+                path = module.split('path = ')[1].split('\n')[0].strip()
+                url = module.split('url = ')[1].strip()
+                sha = path_to_sha.get(path, '')
+                yield name, path, url, sha
+            except (ValueError, IndexError) as e:
+                LOG.warning('Failed to parse submodule "{}" #{}:{}'.format(
+                    locals().get('name', ''), i, e
+                ))
 
     def get_shas(self):
         git = Git(self.path)
