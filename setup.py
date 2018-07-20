@@ -23,7 +23,7 @@ from setuptools import setup
 
 setup(
     name='msm',
-    version='0.5.16',
+    version='0.5.17',
     packages=['msm'],
     install_requires=['GitPython', 'typing'],
     url='https://github.com/MycroftAI/mycroft-skills-manager',
