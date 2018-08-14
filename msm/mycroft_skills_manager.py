@@ -117,9 +117,8 @@ class MycroftSkillsManager(object):
 
         if self.platform not in skill_groups:
             LOG.error('Unknown platform:' + self.platform)
-        return chain(*[
-            skill_groups.get(i, []) for i in {'default', self.platform}
-        ])
+        return skill_groups.get(self.platform,
+                                skill_groups.get('default', []))
 
     def list(self):
         """
