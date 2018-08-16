@@ -38,7 +38,7 @@ class SkillRepo(object):
     def __init__(self, path=None, url=None, branch=None):
         self.path = path or "/opt/mycroft/.skills-repo"
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
-        self.branch = branch or "18.02"
+        self.branch = branch or "18.08"
         self.repo_info = {}
 
     def read_file(self, filename):
