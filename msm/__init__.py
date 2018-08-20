@@ -1,6 +1,6 @@
 # Copyright (c) 2018 Mycroft AI, Inc.
 #
-# This file is part of Mycroft Light
+# This file is part of Mycroft Skills Manager
 # (see https://github.com/MatthewScholefield/mycroft-light).
 #
 # Licensed to the Apache Software Foundation (ASF) under one
