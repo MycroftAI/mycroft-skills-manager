@@ -21,7 +21,6 @@
 # under the License.
 from contextlib import contextmanager
 
-from future.utils import raise_from
 from git import GitError
 
 
@@ -100,4 +99,4 @@ def git_to_msm_exceptions():
     try:
         yield
     except GitError as e:
-        raise_from(GitException('Git command failed: {}'.format(repr(e))), e)
+        raise GitException('Git command failed: {}'.format(repr(e))) from e
