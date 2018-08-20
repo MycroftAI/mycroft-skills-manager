@@ -35,5 +35,6 @@ setup(
         'console_scripts': {
             'msm=msm.__main__:main'
         }
-    }
+    },
+    data_files=[('msm', ['LICENSE'])]
 )
