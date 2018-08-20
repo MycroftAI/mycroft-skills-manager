@@ -63,8 +63,11 @@ def main(args=None, printer=print):
     subparsers = parser.add_subparsers(dest='action')
     subparsers.required = True
 
-    def add_search_args(subparser):
-        subparser.add_argument('skill')
+    def add_search_args(subparser, skill_is_optional=False):
+        if skill_is_optional:
+            subparser.add_argument('skill', nargs='?')
+        else:
+            subparser.add_argument('skill')
         subparser.add_argument('author', nargs='?')
 
     add_search_args(subparsers.add_parser('install'))
@@ -73,7 +76,7 @@ def main(args=None, printer=print):
     add_search_args(subparsers.add_parser('info'))
     subparsers.add_parser('list').add_argument('-i', '--installed',
                                                action='store_true')
-    subparsers.add_parser('update')
+    add_search_args(subparsers.add_parser('update'), skill_is_optional=True)
     subparsers.add_parser('default')
     args = parser.parse_args(args or sys.argv[1:])
 
@@ -96,7 +99,7 @@ def main(args=None, printer=print):
             for skill in msm.list()
             if not args.installed or skill.is_local
         ),
-        'update': msm.update,
+        'update': lambda: msm.update(args.skill, args.author),
         'default': msm.install_defaults,
         'search': lambda: '\n'.join(
             skill.name
