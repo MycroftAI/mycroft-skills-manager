@@ -55,14 +55,20 @@ class MycroftSkillsManager(object):
         """Remove by url or name"""
         self.find_skill(param, author).remove()
 
-    def update(self):
-        """Update all downloaded skills"""
+    def update_all(self):
         local_skills = [skill for skill in self.list() if skill.is_local]
 
         def update_skill(skill):
             skill.update()
 
         return self.apply(update_skill, local_skills)
+
+    def update(self, skill=None, author=None):
+        """Update all downloaded skills or one specified skill."""
+        if skill is None:
+            return self.update_all()
+        else:
+            return self.find_skill(skill, author).update()
 
     def apply(self, func, skills):
         """Run a function on all skills in parallel"""

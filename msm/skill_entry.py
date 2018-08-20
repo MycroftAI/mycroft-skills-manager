@@ -37,7 +37,7 @@ from threading import Lock
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
-    AlreadyRemoved, RemoveException, CloneException
+    AlreadyRemoved, RemoveException, CloneException, NotInstalled
 from msm.util import Git
 
 LOG = logging.getLogger(__name__)
@@ -265,6 +265,8 @@ class SkillEntry(object):
         return sha_branch
 
     def update(self):
+        if not self.is_local:
+            raise NotInstalled('{} is not installed'.format(self.name))
         git = Git(self.path)
 
         with git_to_msm_exceptions():

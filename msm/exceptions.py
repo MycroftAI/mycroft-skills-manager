@@ -72,6 +72,10 @@ class AlreadyInstalled(InstallException):
     pass
 
 
+class NotInstalled(MsmException):
+    pass
+
+
 class SystemRequirementsException(InstallException):
     pass
 
