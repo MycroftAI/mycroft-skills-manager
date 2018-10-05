@@ -63,6 +63,11 @@ def main(args=None, printer=print):
     subparsers = parser.add_subparsers(dest='action')
     subparsers.required = True
 
+    def add_constraint_args(subparser):
+        subparser.add_argument('--constraints',
+                               help='limit the installed requirements using '
+                                    'a pip constraint.txt file.')
+
     def add_search_args(subparser, skill_is_optional=False):
         if skill_is_optional:
             subparser.add_argument('skill', nargs='?')
@@ -70,7 +75,9 @@ def main(args=None, printer=print):
             subparser.add_argument('skill')
         subparser.add_argument('author', nargs='?')
 
-    add_search_args(subparsers.add_parser('install'))
+    install_parser = subparsers.add_parser('install')
+    add_search_args(install_parser)
+    add_constraint_args(install_parser)
     add_search_args(subparsers.add_parser('remove'))
     add_search_args(subparsers.add_parser('search'))
     add_search_args(subparsers.add_parser('info'))
@@ -90,7 +97,8 @@ def main(args=None, printer=print):
         args.platform, args.skills_dir, repo, args.versioned
     )
     main_functions = {
-        'install': lambda: msm.install(args.skill, args.author),
+        'install': lambda: msm.install(args.skill, args.author,
+                                       args.constraints),
         'remove': lambda: msm.remove(args.skill, args.author),
         'list': lambda: '\n'.join(
             skill.name + (
