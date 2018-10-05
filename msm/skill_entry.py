@@ -46,6 +46,8 @@ LOG = logging.getLogger(__name__)
 # TODO Make this configurable
 SWITCHABLE_BRANCHES = ['master']
 
+# default constraints to use if no are given
+DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
 
 @contextmanager
 def work_dir(directory):
@@ -150,16 +152,25 @@ class SkillEntry(object):
                 sum(weight for weight, val in weights)
         )
 
-    def run_pip(self):
+    def run_pip(self, constraints):
         requirements_file = join(self.path, "requirements.txt")
         if not exists(requirements_file):
             return False
+
+        # Use constraints to limit the installed versions
+        if constraints and not exists(constraints):
+            LOG.error('Couldn\'t find the constraints file')
+            return False
+        elif exists(DEFAULT_CONSTRAINTS):
+            constraints = DEFAULT_CONSTRAINTS
 
         LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
         pip_args = [
             sys.executable, '-m', 'pip', 'install', '-r', requirements_file
         ]
+        if constraints:
+            pip_args += ['-c', constraints]
 
         if not can_pip:
             pip_args = ['sudo', '-n'] + pip_args
@@ -215,7 +226,7 @@ class SkillEntry(object):
         with open(reqs, "r") as f:
             return [i.strip() for i in f.readlines() if i.strip()]
 
-    def install(self):
+    def install(self, constraints=None):
         if self.is_local:
             raise AlreadyInstalled(self.name)
 
@@ -239,7 +250,7 @@ class SkillEntry(object):
             move(tmp_location, self.path)
 
             self.run_requirements_sh()
-            self.run_pip()
+            self.run_pip(constraints)
         finally:
             if isfile(join(self.path, '__init__')):
                 move(join(self.path, '__init__'),

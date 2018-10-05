@@ -47,9 +47,9 @@ class MycroftSkillsManager(object):
         self.repo = repo or SkillRepo()
         self.versioned = versioned
 
-    def install(self, param, author=None):
+    def install(self, param, author=None, constraints=None):
         """Install by url or name"""
-        self.find_skill(param, author).install()
+        self.find_skill(param, author).install(constraints)
 
     def remove(self, param, author=None):
         """Remove by url or name"""
