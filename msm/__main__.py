@@ -98,7 +98,7 @@ def main(args=None, printer=print):
     )
     main_functions = {
         'install': lambda: msm.install(args.skill, args.author,
-                                       args.constraints),
+                                       args.constraints, 'cli'),
         'remove': lambda: msm.remove(args.skill, args.author),
         'list': lambda: '\n'.join(
             skill.name + (
@@ -127,7 +127,8 @@ def main(args=None, printer=print):
         exc_type = e.__class__.__name__
         printer('{}: {}'.format(exc_type, str(e)))
         return get_error_code(e.__class__)
-
+    finally:
+        msm.write_skills_data(msm.skills_data)
 
 if __name__ == "__main__":
     main()

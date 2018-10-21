@@ -25,14 +25,22 @@ from itertools import chain
 from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname, isdir
 
+import time
+
 from typing import Dict, List
 
 from msm import GitException
-from msm.exceptions import MsmException, SkillNotFound, MultipleSkillMatches
+from msm.exceptions import (MsmException, SkillNotFound, MultipleSkillMatches,
+                            AlreadyInstalled)
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
-
+from msm.skills_data import (build_skill_entry, get_skill_entry,
+                             write_skills_data, load_skills_data)
 LOG = logging.getLogger(__name__)
+
+CURRENT_SKILLS_DATA_VERSION = 1
+
+
 
 
 class MycroftSkillsManager(object):
@@ -46,20 +54,117 @@ class MycroftSkillsManager(object):
                           or self.DEFAULT_SKILLS_DIR
         self.repo = repo or SkillRepo()
         self.versioned = versioned
+        self.skills_data = self.load_skills_data()
 
-    def install(self, param, author=None, constraints=None):
+    def __upgrade_skills_data(self, skills_data):
+        new = {}
+        if skills_data.get('version', 0) == 0:
+            new['blacklist'] = []
+            new['version'] = 1
+            new['skills'] = []
+            local_skills = [s for s in self.list() if s.is_local]
+            default_skills = [s.name for s in self.list_defaults()]
+            for skill in local_skills:
+                if skill.name in default_skills:
+                    origin = 'default'
+                elif skill.url:
+                    origin = 'cli'
+                else:
+                    origin = 'non-msm'
+                beta = skills_data.get(skill, {}).get('beta', False)
+                entry = build_skill_entry(skill.name, origin, beta)
+                new['skills'].append(entry)
+        return new
+
+    def curate_skills_data(self, skills_data):
+        """ Sync list with actual skills on disk. """
+        local_skills = [s for s in self.list() if s.is_local]
+        default_skills = [s.name for s in self.list_defaults()]
+        local_skill_names = [s.name for s in local_skills]
+        skills_data_skills = [s['name'] for s in skills_data['skills']]
+
+        # Check for skills that aren't in the list
+        for skill in local_skills:
+            if skill.name not in skills_data_skills:
+                if skill.name in default_skills:
+                    origin = 'default'
+                elif skill.url:
+                    origin = 'cli'
+                else:
+                    origin = 'non-msm'
+                entry = build_skill_entry(skill.name, origin, False)
+                skills_data['skills'].append(entry)
+
+        # Check for skills in the list that doesn't exist in the filesystem
+        remove_list = []
+        for s in skills_data.get('skills', []):
+            if (s['name'] not in local_skill_names and
+                    s['installation'] == 'installed'):
+                remove_list.append(s)
+        for skill in remove_list:
+            skills_data['skills'].remove(skill)
+        return skills_data
+
+    def load_skills_data(self) -> dict:
+        skills_data = load_skills_data()
+        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
+            skills_data = self.__upgrade_skills_data(skills_data)
+        else:
+            skills_data = self.curate_skills_data(skills_data)
+        return skills_data
+
+    @staticmethod
+    def write_skills_data(data: dict):
+        write_skills_data(data)
+
+    def install(self, param, author=None, constraints=None, origin=''):
         """Install by url or name"""
-        self.find_skill(param, author).install(constraints)
+        if isinstance(param, SkillEntry):
+            skill = param
+        else:
+            skill = self.find_skill(param, author)
+        entry = build_skill_entry(skill.name, origin, skill.sha != '')
+        try:
+            skill.install(constraints)
+            entry['installed'] = time.time()
+            entry['installation'] = 'installed'
+            entry['status'] = 'active'
+        except AlreadyInstalled:
+            entry = None
+            raise
+        except MsmException as e:
+            entry['installation'] = 'failed'
+            entry['status'] = 'error'
+            entry['failure_message'] = repr(e)
+            raise
+        finally:
+            # Store the entry in the list
+            if entry:
+                self.skills_data['skills'].append(entry)
 
     def remove(self, param, author=None):
         """Remove by url or name"""
-        self.find_skill(param, author).remove()
+        if isinstance(param, SkillEntry):
+            skill = param
+        else:
+            skill = self.find_skill(param, author)
+        skill.remove()
+        for s in self.skills_data['skills']:
+            if s['name'] == skill.name:
+                break
+        else:
+            return
+        self.skills_data['skills'].remove(s)
+        return
 
     def update_all(self):
         local_skills = [skill for skill in self.list() if skill.is_local]
 
         def update_skill(skill):
-            skill.update()
+            if skill.update():
+                entry = get_skill_entry(skill.name, self.skills_data)
+                if entry:
+                    entry['updated'] = time.time()
 
         return self.apply(update_skill, local_skills)
 
@@ -68,7 +173,13 @@ class MycroftSkillsManager(object):
         if skill is None:
             return self.update_all()
         else:
-            return self.find_skill(skill, author).update()
+            if isinstance(skill, str):
+                skill = self.find_skill(skill, author)
+            if skill.update():
+                # On successful update update the update value
+                entry = get_skill_entry(skill.name, self.skills_data)
+                if entry:
+                    entry['updated'] = time.time()
 
     def apply(self, func, skills):
         """Run a function on all skills in parallel"""
@@ -88,16 +199,15 @@ class MycroftSkillsManager(object):
                 ))
 
         with ThreadPool(100) as tp:
-            return all(tp.map(run_item, skills))
+            return (tp.map(run_item, skills))
 
     def install_defaults(self):
         """Installs the default skills, updates all others"""
-
         def install_or_update_skill(skill):
             if skill.is_local:
-                skill.update()
+                self.update(skill)
             else:
-                skill.install()
+                self.install(skill, origin='default')
 
         return self.apply(install_or_update_skill, self.list_defaults())
 
