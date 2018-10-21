@@ -302,8 +302,10 @@ class SkillEntry(object):
             LOG.info('Updated ' + self.name)
             # Trigger reload by modifying the timestamp
             os.utime(join(self.path, '__init__.py'))
+            return True
         else:
             LOG.info('Nothing new for ' + self.name)
+            return False
 
     def remove(self):
         if not self.is_local:
