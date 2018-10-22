@@ -36,11 +36,13 @@ from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
 from msm.skills_data import (build_skill_entry, get_skill_entry,
                              write_skills_data, load_skills_data)
+
+from msm.util import MsmProcessLock
+
+
 LOG = logging.getLogger(__name__)
 
 CURRENT_SKILLS_DATA_VERSION = 1
-
-
 
 
 class MycroftSkillsManager(object):
@@ -54,7 +56,10 @@ class MycroftSkillsManager(object):
                           or self.DEFAULT_SKILLS_DIR
         self.repo = repo or SkillRepo()
         self.versioned = versioned
-        self.skills_data = self.load_skills_data()
+        self.lock = MsmProcessLock()
+
+        with self.lock:
+            self.skills_data = self.load_skills_data()
 
     def __upgrade_skills_data(self, skills_data):
         new = {}

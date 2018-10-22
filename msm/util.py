@@ -20,7 +20,9 @@
 # specific language governing permissions and limitations
 # under the License.
 import git
-
+from os.path import exists
+from os import chmod
+from fasteners.process_lock import InterProcessLock
 
 class Git(git.cmd.Git):
     """Prevents asking for password for private repos"""
@@ -32,3 +34,13 @@ class Git(git.cmd.Git):
             env.update(self.env)
             return super(Git, self).__getattr__(item)(*args, env=env, **kwargs)
         return wrapper
+
+
+class MsmProcessLock(InterProcessLock):
+    def __init__(self):
+        lock_path = '/tmp/msm_lock'
+        if not exists(lock_path):
+            lock_file = open(lock_path, '+w')
+            lock_file.close()
+            chmod(lock_path, 0o777)
+        super().__init__(lock_path)
