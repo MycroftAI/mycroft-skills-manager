@@ -116,19 +116,20 @@ def main(args=None, printer=print):
         ),
         'info': lambda: skill_info(msm.find_skill(args.skill, args.author))
     }
-    try:
-        result = main_functions[args.action]()
-        if result is False:
-            return 1
-        if isinstance(result, str):
-            printer(result)
-        return 0
-    except MsmException as e:
-        exc_type = e.__class__.__name__
-        printer('{}: {}'.format(exc_type, str(e)))
-        return get_error_code(e.__class__)
-    finally:
-        msm.write_skills_data(msm.skills_data)
+    with msm.lock:
+        try:
+            result = main_functions[args.action]()
+            if result is False:
+                return 1
+            if isinstance(result, str):
+                printer(result)
+            return 0
+        except MsmException as e:
+            exc_type = e.__class__.__name__
+            printer('{}: {}'.format(exc_type, str(e)))
+            return get_error_code(e.__class__)
+        finally:
+            msm.write_skills_data(msm.skills_data)
 
 if __name__ == "__main__":
     main()
