@@ -265,11 +265,11 @@ class SkillEntry(object):
 
         LOG.info('Successfully installed ' + self.name)
 
-    def update_deps(self):
+    def update_deps(self, constraints=None):
         if self.msm:
             self.run_skill_requirements()
         self.run_requirements_sh()
-        self.run_pip()
+        self.run_pip(constraints)
 
     def _find_sha_branch(self):
         git = Git(self.path)
