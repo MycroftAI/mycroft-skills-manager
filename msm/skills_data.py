@@ -9,8 +9,11 @@ def load_skills_data() -> dict:
     """Contains info on how skills should be updated"""
     skills_data_file = expanduser('~/.mycroft/skills.json')
     if isfile(skills_data_file):
-        with open(skills_data_file) as f:
-            return json.load(f)
+        try:
+            with open(skills_data_file) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
     else:
         return {}
 

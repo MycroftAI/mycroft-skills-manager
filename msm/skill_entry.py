@@ -73,6 +73,13 @@ class SkillEntry(object):
         self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
 
+    @property
+    def is_beta(self):
+        return not self.sha or self.sha == 'HEAD'
+
+    def __str__(self):
+        return self.name
+
     def attach(self, remote_entry):
         """Attach a remote entry to a local entry"""
         self.name = remote_entry.name

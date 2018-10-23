@@ -129,7 +129,7 @@ def main(args=None, printer=print):
             printer('{}: {}'.format(exc_type, str(e)))
             return get_error_code(e.__class__)
         finally:
-            msm.write_skills_data(msm.skills_data)
+            msm.write_skills_data()
 
 if __name__ == "__main__":
     main()

@@ -39,7 +39,6 @@ from msm.skills_data import (build_skill_entry, get_skill_entry,
 
 from msm.util import MsmProcessLock
 
-
 LOG = logging.getLogger(__name__)
 
 CURRENT_SKILLS_DATA_VERSION = 1
@@ -59,7 +58,7 @@ class MycroftSkillsManager(object):
         self.lock = MsmProcessLock()
 
         with self.lock:
-            self.skills_data = self.load_skills_data()
+            self.sync_skills_data()
 
     def __upgrade_skills_data(self, skills_data):
         new = {}
@@ -82,7 +81,7 @@ class MycroftSkillsManager(object):
         return new
 
     def curate_skills_data(self, skills_data):
-        """ Sync list with actual skills on disk. """
+        """ Sync skills_data with actual skills on disk. """
         local_skills = [s for s in self.list() if s.is_local]
         default_skills = [s.name for s in self.list_defaults()]
         local_skill_names = [s.name for s in local_skills]
@@ -118,9 +117,12 @@ class MycroftSkillsManager(object):
             skills_data = self.curate_skills_data(skills_data)
         return skills_data
 
-    @staticmethod
-    def write_skills_data(data: dict):
-        write_skills_data(data)
+    def sync_skills_data(self):
+        """ Update internal skill_data_structure from disk. """
+        self.skills_data = self.load_skills_data()
+
+    def write_skills_data(self, data=None):
+        write_skills_data(data or self.skills_data)
 
     def install(self, param, author=None, constraints=None, origin=''):
         """Install by url or name"""
@@ -128,7 +130,7 @@ class MycroftSkillsManager(object):
             skill = param
         else:
             skill = self.find_skill(param, author)
-        entry = build_skill_entry(skill.name, origin, skill.sha != '')
+        entry = build_skill_entry(skill.name, origin, skill.is_beta)
         try:
             skill.install(constraints)
             entry['installed'] = time.time()
@@ -154,20 +156,19 @@ class MycroftSkillsManager(object):
         else:
             skill = self.find_skill(param, author)
         skill.remove()
-        for s in self.skills_data['skills']:
-            if s['name'] == skill.name:
-                break
-        else:
-            return
-        self.skills_data['skills'].remove(s)
+        skills = [s for s in self.skills_data['skills']
+                  if s['name'] != skill.name]
+        self.skills_data['skills'] = skills
         return
 
     def update_all(self):
         local_skills = [skill for skill in self.list() if skill.is_local]
 
         def update_skill(skill):
+            entry = get_skill_entry(skill.name, self.skills_data)
+            if entry:
+                entry['beta'] = skill.is_beta
             if skill.update():
-                entry = get_skill_entry(skill.name, self.skills_data)
                 if entry:
                     entry['updated'] = time.time()
 
@@ -180,9 +181,11 @@ class MycroftSkillsManager(object):
         else:
             if isinstance(skill, str):
                 skill = self.find_skill(skill, author)
+            entry = get_skill_entry(skill.name, self.skills_data)
+            if entry:
+                entry['beta'] = True
             if skill.update():
                 # On successful update update the update value
-                entry = get_skill_entry(skill.name, self.skills_data)
                 if entry:
                     entry['updated'] = time.time()
 
