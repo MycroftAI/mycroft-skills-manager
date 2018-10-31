@@ -49,3 +49,7 @@ def build_skill_entry(name, origin, beta) -> dict:
     entry['updated'] = 0
     entry['installation'] = 'installed'
     return entry
+
+
+def skills_data_hash(data):
+    return hash(json.dumps(data, sort_keys=True))
