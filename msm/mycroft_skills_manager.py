@@ -71,14 +71,21 @@ class MycroftSkillsManager(object):
             local_skills = [s for s in self.list() if s.is_local]
             default_skills = [s.name for s in self.list_defaults()]
             for skill in local_skills:
-                if skill.name in default_skills:
+                if 'origin' in skills_data.get(skill.name, {}):
+                    origin = skills_data[skill.name]['origin']
+                elif skill.name in default_skills:
                     origin = 'default'
                 elif skill.url:
                     origin = 'cli'
                 else:
                     origin = 'non-msm'
-                beta = skills_data.get(skill, {}).get('beta', False)
+                beta = skills_data.get(skill.name, {}).get('beta', False)
                 entry = build_skill_entry(skill.name, origin, beta)
+                entry['installed'] = \
+                    skills_data.get(skill.name, {}).get('installed') or 0
+                entry['update'] = \
+                    skills_data.get(skill.name, {}).get('updated') or 0
+
                 new['skills'].append(entry)
             new['upgraded'] = True
         return new
@@ -194,7 +201,7 @@ class MycroftSkillsManager(object):
                 skill = self.find_skill(skill, author)
             entry = get_skill_entry(skill.name, self.skills_data)
             if entry:
-                entry['beta'] = True
+                entry['beta'] = skill.is_beta
             if skill.update():
                 # On successful update update the update value
                 if entry:
