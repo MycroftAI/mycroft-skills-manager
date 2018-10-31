@@ -35,7 +35,8 @@ from msm.exceptions import (MsmException, SkillNotFound, MultipleSkillMatches,
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
 from msm.skills_data import (build_skill_entry, get_skill_entry,
-                             write_skills_data, load_skills_data)
+                             write_skills_data, load_skills_data,
+                             skills_data_hash)
 
 from msm.util import MsmProcessLock
 
@@ -57,6 +58,7 @@ class MycroftSkillsManager(object):
         self.versioned = versioned
         self.lock = MsmProcessLock()
 
+        self.skills_data = None
         with self.lock:
             self.sync_skills_data()
 
@@ -78,6 +80,7 @@ class MycroftSkillsManager(object):
                 beta = skills_data.get(skill, {}).get('beta', False)
                 entry = build_skill_entry(skill.name, origin, beta)
                 new['skills'].append(entry)
+            new['upgraded'] = True
         return new
 
     def curate_skills_data(self, skills_data):
@@ -120,9 +123,17 @@ class MycroftSkillsManager(object):
     def sync_skills_data(self):
         """ Update internal skill_data_structure from disk. """
         self.skills_data = self.load_skills_data()
+        if 'upgraded' in self.skills_data:
+            self.skills_data.pop('upgraded')
+            self.skills_data_hash = ''
+        else:
+            self.skills_data_hash = skills_data_hash(self.skills_data)
 
     def write_skills_data(self, data=None):
-        write_skills_data(data or self.skills_data)
+        """ Write skills data hash if it has been modified. """
+        data = data or self.skills_data
+        if skills_data_hash(data) != self.skills_data_hash:
+            write_skills_data(data)
 
     def install(self, param, author=None, constraints=None, origin=''):
         """Install by url or name"""
