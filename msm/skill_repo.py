@@ -22,9 +22,10 @@
 from glob import glob
 from os import makedirs
 from os.path import exists, join, isdir, dirname, basename
+from shutil import rmtree
 
 from git import Repo
-from git.exc import GitCommandError
+from git.exc import GitCommandError, GitError
 
 from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
@@ -45,23 +46,39 @@ class SkillRepo(object):
         with open(join(self.path, filename)) as f:
             return f.read()
 
-    def update(self):
+    def __prepare_repo(self):
         if not exists(dirname(self.path)):
             makedirs(dirname(self.path))
 
-        with git_to_msm_exceptions():
-            if not isdir(self.path):
-                Repo.clone_from(self.url, self.path)
+        if not isdir(self.path):
+            Repo.clone_from(self.url, self.path)
 
-            git = Git(self.path)
-            git.config('remote.origin.url', self.url)
-            git.fetch()
+        git = Git(self.path)
+        git.config('remote.origin.url', self.url)
+        git.fetch()
 
         try:
             git.checkout(self.branch)
             git.reset('origin/' + self.branch, hard=True)
         except GitCommandError:
             raise MsmException('Invalid branch: ' + self.branch)
+
+    def update(self):
+        try:
+            self.__prepare_repo()
+        except GitError as e:
+            LOG.warning('Could not prepare repo ({}), '
+                        ' recreating repo...'
+                        ' Creating temporary repo'.format(repr(e)))
+            try:
+                rmtree(self.path)
+                self.__prepare_repo()
+            except (GitError, OSError) as e:
+                LOG.warning('Could not recreate repo ({}). '
+                            'Will use a temporary repo'.format(repr(e)))
+                self.path = '/tmp/.skills-repo'
+                with git_to_msm_exceptions():
+                    self.__prepare_repo()
 
     def get_skill_data(self):
         """ generates tuples of name, path, url, sha """
