@@ -24,7 +24,7 @@ from glob import glob
 from itertools import chain
 from multiprocessing.pool import ThreadPool
 from os.path import expanduser, join, dirname, isdir
-
+from functools import wraps
 import time
 
 from typing import Dict, List
@@ -45,6 +45,21 @@ LOG = logging.getLogger(__name__)
 CURRENT_SKILLS_DATA_VERSION = 1
 
 
+def save_skills_data(func):
+    @wraps(func)
+    def func_wrapper(self, *args, **kwargs):
+        will_save = False
+        if not self.saving_handled:
+            will_save = self.saving_handled = True
+        ret = func(self, *args, **kwargs)
+        if will_save:
+            self.write_skills_data()
+            self.saving_handled = False
+        return ret
+
+    return func_wrapper
+
+
 class MycroftSkillsManager(object):
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -59,6 +74,7 @@ class MycroftSkillsManager(object):
         self.lock = MsmProcessLock()
 
         self.skills_data = None
+        self.saving_handled = False
         with self.lock:
             self.sync_skills_data()
 
@@ -142,6 +158,7 @@ class MycroftSkillsManager(object):
         if skills_data_hash(data) != self.skills_data_hash:
             write_skills_data(data)
 
+    @save_skills_data
     def install(self, param, author=None, constraints=None, origin=''):
         """Install by url or name"""
         if isinstance(param, SkillEntry):
@@ -167,6 +184,7 @@ class MycroftSkillsManager(object):
             if entry:
                 self.skills_data['skills'].append(entry)
 
+    @save_skills_data
     def remove(self, param, author=None):
         """Remove by url or name"""
         if isinstance(param, SkillEntry):
@@ -192,6 +210,7 @@ class MycroftSkillsManager(object):
 
         return self.apply(update_skill, local_skills)
 
+    @save_skills_data
     def update(self, skill=None, author=None):
         """Update all downloaded skills or one specified skill."""
         if skill is None:
@@ -207,6 +226,7 @@ class MycroftSkillsManager(object):
                 if entry:
                     entry['updated'] = time.time()
 
+    @save_skills_data
     def apply(self, func, skills):
         """Run a function on all skills in parallel"""
 
@@ -227,6 +247,7 @@ class MycroftSkillsManager(object):
         with ThreadPool(100) as tp:
             return (tp.map(run_item, skills))
 
+    @save_skills_data
     def install_defaults(self):
         """Installs the default skills, updates all others"""
         def install_or_update_skill(skill):
