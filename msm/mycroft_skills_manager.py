@@ -51,10 +51,16 @@ def save_skills_data(func):
         will_save = False
         if not self.saving_handled:
             will_save = self.saving_handled = True
-        ret = func(self, *args, **kwargs)
-        if will_save:
-            self.write_skills_data()
-            self.saving_handled = False
+        try:
+            ret = func(self, *args, **kwargs)
+            # Write only if no exception occurs
+            if will_save:
+                self.write_skills_data()
+        finally:
+            # Always restore saving_handled flag
+            if will_save:
+                self.saving_handled = False
+
         return ret
 
     return func_wrapper
