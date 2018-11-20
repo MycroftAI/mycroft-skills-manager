@@ -105,6 +105,9 @@ class MycroftSkillsManager(object):
                 entry = build_skill_entry(skill.name, origin, beta)
                 entry['installed'] = \
                     skills_data.get(skill.name, {}).get('installed') or 0
+                if isinstance(entry['installed'], bool):
+                    entry['installed'] = 0
+
                 entry['update'] = \
                     skills_data.get(skill.name, {}).get('updated') or 0
 
