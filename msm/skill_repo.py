@@ -22,7 +22,6 @@
 from glob import glob
 from os import makedirs
 from os.path import exists, join, isdir, dirname, basename
-from shutil import rmtree
 
 from git import Repo
 from git.exc import GitCommandError, GitError
@@ -68,17 +67,18 @@ class SkillRepo(object):
             self.__prepare_repo()
         except GitError as e:
             LOG.warning('Could not prepare repo ({}), '
-                        ' recreating repo...'
                         ' Creating temporary repo'.format(repr(e)))
+            original_path = self.path
+            self.path = '/tmp/.skills-repo'
             try:
-                rmtree(self.path)
-                self.__prepare_repo()
-            except (GitError, OSError) as e:
-                LOG.warning('Could not recreate repo ({}). '
-                            'Will use a temporary repo'.format(repr(e)))
-                self.path = '/tmp/.skills-repo'
                 with git_to_msm_exceptions():
                     self.__prepare_repo()
+            except Exception:
+                LOG.warning('Could not use temporary repo either ({}), '
+                            ' trying to use existing one without '
+                            'update'.format(repr(e)))
+                self.path = original_path  # Restore path to previous value
+                raise
 
     def get_skill_data(self):
         """ generates tuples of name, path, url, sha """
