@@ -237,9 +237,6 @@ class SkillEntry(object):
         if self.is_local:
             raise AlreadyInstalled(self.name)
 
-        if self.msm:
-            self.run_skill_requirements()
-
         LOG.info("Downloading skill: " + self.url)
         try:
             tmp_location = mktemp()
@@ -255,6 +252,9 @@ class SkillEntry(object):
 
         try:
             move(tmp_location, self.path)
+
+            if self.msm:
+                self.run_skill_requirements()
 
             self.run_requirements_sh()
             self.run_pip(constraints)
