@@ -19,26 +19,30 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import sys
+
 import logging
 import os
+import shutil
 import subprocess
-import sys
+import yaml
 from contextlib import contextmanager
 from difflib import SequenceMatcher
+from git import Repo, GitError
+from git.exc import GitCommandError
+from lazy import lazy
 from os.path import exists, join, basename, dirname, isfile
 from shutil import rmtree, move
 from subprocess import PIPE, Popen
 from tempfile import mktemp
-
-from git import Repo, GitError
-from git.exc import GitCommandError
 from threading import Lock
 
-from msm import SkillRequirementsException, git_to_msm_exceptions
+from msm import SkillRequirementsException, git_to_msm_exceptions, MsmException
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException, NotInstalled
 from msm.util import Git
+from functools import wraps
 
 LOG = logging.getLogger(__name__)
 
@@ -48,6 +52,7 @@ SWITCHABLE_BRANCHES = ['master']
 
 # default constraints to use if no are given
 DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
+
 
 @contextmanager
 def work_dir(directory):
@@ -59,8 +64,32 @@ def work_dir(directory):
         os.chdir(old_dir)
 
 
+def on_msm_error(handler):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            try:
+                func(self, *args, **kwargs)
+            except MsmException:
+                handler(self)
+                raise
+        return wrapper
+    return decorator
+
+
 class SkillEntry(object):
     pip_lock = Lock()
+    manifest_yml_format = {
+        'name': '',
+        'description': '',
+        'author': '',
+        'dependencies': {
+            'system': {},
+            'exes': [],
+            'skill': [],
+            'python': []
+        }
+    }
 
     def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
@@ -160,9 +189,8 @@ class SkillEntry(object):
         )
 
     def run_pip(self, constraints):
-        requirements_file = join(self.path, "requirements.txt")
-        if not exists(requirements_file):
-            return False
+        if not self.dependent_python_packages:
+            return
 
         # Use constraints to limit the installed versions
         if constraints and not exists(constraints):
@@ -174,7 +202,8 @@ class SkillEntry(object):
         LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
         pip_args = [
-            sys.executable, '-m', 'pip', 'install', '-r', requirements_file
+            sys.executable, '-m', 'pip', 'install',
+            ' '.join(self.dependent_python_packages)
         ]
         if constraints:
             pip_args += ['-c', constraints]
@@ -198,6 +227,46 @@ class SkillEntry(object):
 
         return True
 
+    def install_system_deps(self):
+        success = True
+        self.run_requirements_sh()
+        system_packages = self.dependent_system_packages
+        LOG.info('Installing system requirements...')
+        all_deps = system_packages.pop('all', '').split()
+        for exe_name, install_line in system_packages.items():
+            if shutil.which(exe_name):
+                command = exe_name + ' ' + install_line
+                io = PIPE
+                if sys.stdout.isatty() and shutil.which('sudo'):
+                    io = None
+                    command = 'sudo ' + command
+                    print('Running command: ' + command)
+                    print('Requesting sudo...')
+                proc = Popen(command, stdout=io, stderr=io, shell=True)
+                status = proc.wait()
+                if status == 0:
+                    break
+                LOG.warning('Failed to install deps for {} on {}!'.format(
+                    self.name, exe_name
+                ))
+        else:
+            success = False
+        missing_exes = [
+            exe for exe in self.dependencies.get('exes', [])
+            if not shutil.which(exe)
+        ]
+        if missing_exes:
+            if not success:
+                LOG.warning('Failed to install dependencies.')
+                if all_deps:
+                    LOG.warning('Please install manually: {}'.format(
+                        ' '.join(all_deps)
+                    ))
+            raise SkillRequirementsException('Could not find exes: {}'.format(
+                ', '.join(missing_exes)
+            ))
+        return success
+
     def run_requirements_sh(self):
         setup_script = join(self.path, "requirements.sh")
         if not exists(setup_script):
@@ -216,7 +285,7 @@ class SkillEntry(object):
         if not self.msm:
             raise ValueError('Pass msm to SkillEntry to install skill deps')
         try:
-            for skill_dep in self.get_dependent_skills():
+            for skill_dep in self.dependent_skills:
                 LOG.info("Installing skill dependency: {}".format(skill_dep))
                 try:
                     self.msm.install(skill_dep)
@@ -225,14 +294,82 @@ class SkillEntry(object):
         except Exception as e:
             raise SkillRequirementsException(e)
 
-    def get_dependent_skills(self):
+    def verify_info(self, info, fmt):
+        if not isinstance(info, type(fmt)):
+            LOG.warning('Invalid value type manifest.yml for {}: {}'.format(
+                self.name, type(info)
+            ))
+            return
+        if not isinstance(info, dict) or not fmt:
+            return
+        for key in info:
+            if key not in fmt:
+                LOG.warning('Unknown key in manifest.yml for {}: {}'.format(
+                    self.name, key
+                ))
+                continue
+            self.verify_info(info[key], fmt[key])
+
+    @lazy
+    def skill_info(self):
+        yml_path = join(self.path, 'manifest.yml')
+        if exists(yml_path):
+            LOG.info('Reading from manifest.yml')
+            with open(yml_path) as f:
+                info = yaml.load(f)
+                self.verify_info(info, self.manifest_yml_format)
+                return info
+        else:
+            LOG.info(yml_path)
+        return {}
+
+    @lazy
+    def dependencies(self):
+        return self.skill_info.get('dependencies', {})
+
+    @lazy
+    def dependent_skills(self):
+        skills = set()
         reqs = join(self.path, "skill_requirements.txt")
-        if not exists(reqs):
-            return []
+        if exists(reqs):
+            with open(reqs, "r") as f:
+                for i in f.readlines():
+                    skill = i.strip()
+                    if skill:
+                        skills.add(skill)
+        for i in self.dependencies.get('skill', []):
+            skills.add(i)
+        return list(skills)
 
-        with open(reqs, "r") as f:
-            return [i.strip() for i in f.readlines() if i.strip()]
+    @lazy
+    def dependent_python_packages(self):
+        reqs = join(self.path, "requirements.txt")
+        req_lines = []
+        if exists(reqs):
+            with open(reqs, "r") as f:
+                req_lines += f.readlines()
+        req_lines += self.dependencies.get('python', [])
+        return [i.split('=')[0] for i in req_lines if i]
 
+    @lazy
+    def dependent_system_packages(self):
+        return self.dependencies.get('system', {})
+
+    def remove_silent(self):
+        rmtree(self.path)
+        self.is_local = False
+
+    def remove(self):
+        if not self.is_local:
+            raise AlreadyRemoved(self.name)
+        try:
+            self.remove_silent()
+        except OSError as e:
+            raise RemoveException(str(e))
+
+        LOG.info('Successfully removed ' + self.name)
+
+    @on_msm_error(remove_silent)
     def install(self, constraints=None):
         if self.is_local:
             raise AlreadyInstalled(self.name)
@@ -255,8 +392,7 @@ class SkillEntry(object):
 
             if self.msm:
                 self.run_skill_requirements()
-
-            self.run_requirements_sh()
+            self.install_system_deps()
             self.run_pip(constraints)
         finally:
             if isfile(join(self.path, '__init__')):
@@ -268,7 +404,7 @@ class SkillEntry(object):
     def update_deps(self, constraints=None):
         if self.msm:
             self.run_skill_requirements()
-        self.run_requirements_sh()
+        self.install_system_deps()
         self.run_pip(constraints)
 
     def _find_sha_branch(self):
@@ -313,17 +449,6 @@ class SkillEntry(object):
         else:
             LOG.info('Nothing new for ' + self.name)
             return False
-
-    def remove(self):
-        if not self.is_local:
-            raise AlreadyRemoved(self.name)
-        try:
-            rmtree(self.path)
-        except OSError as e:
-            raise RemoveException(str(e))
-
-        LOG.info('Successfully removed ' + self.name)
-        self.is_local = False
 
     @staticmethod
     def find_git_url(path):
