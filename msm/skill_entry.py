@@ -28,21 +28,22 @@ import subprocess
 import yaml
 from contextlib import contextmanager
 from difflib import SequenceMatcher
+from functools import wraps
 from git import Repo, GitError
 from git.exc import GitCommandError
 from lazy import lazy
 from os.path import exists, join, basename, dirname, isfile
 from shutil import rmtree, move
 from subprocess import PIPE, Popen
-from tempfile import mktemp
+from tempfile import mktemp, gettempdir
 from threading import Lock
+from typing import Callable
 
-from msm import SkillRequirementsException, git_to_msm_exceptions, MsmException
+from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException, NotInstalled
 from msm.util import Git
-from functools import wraps
 
 LOG = logging.getLogger(__name__)
 
@@ -64,17 +65,29 @@ def work_dir(directory):
         os.chdir(old_dir)
 
 
-def on_msm_error(handler):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            try:
-                func(self, *args, **kwargs)
-            except MsmException:
-                handler(self)
-                raise
-        return wrapper
-    return decorator
+def _backup_previous_version(func: Callable=None):
+    """Private decorator to back up previous skill folder"""
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        self.old_path = None
+        if self.is_local:
+            self.old_path = join(gettempdir(), self.name)
+            if exists(self.old_path):
+                rmtree(self.old_path)
+            shutil.copytree(self.path, self.old_path)
+        try:
+            func(self, *args, **kwargs)
+        except Exception:
+            LOG.info('Problem performing action. Restoring skill to '
+                     'previous state...')
+            if exists(self.path):
+                rmtree(self.path)
+            if self.old_path and exists(self.old_path):
+                shutil.copytree(self.old_path, self.path)
+            self.is_local = exists(self.path)
+            raise
+
+    return wrapper
 
 
 class SkillEntry(object):
@@ -101,6 +114,7 @@ class SkillEntry(object):
         self.author = self.extract_author(url) if url else ''
         self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
+        self.old_path = None  # Path of previous version while upgrading
 
     @property
     def is_beta(self):
@@ -355,21 +369,18 @@ class SkillEntry(object):
     def dependent_system_packages(self):
         return self.dependencies.get('system', {})
 
-    def remove_silent(self):
-        rmtree(self.path)
-        self.is_local = False
-
     def remove(self):
         if not self.is_local:
             raise AlreadyRemoved(self.name)
         try:
-            self.remove_silent()
+            rmtree(self.path)
+            self.is_local = False
         except OSError as e:
             raise RemoveException(str(e))
 
         LOG.info('Successfully removed ' + self.name)
 
-    @on_msm_error(remove_silent)
+    @_backup_previous_version
     def install(self, constraints=None):
         if self.is_local:
             raise AlreadyInstalled(self.name)
@@ -418,6 +429,7 @@ class SkillEntry(object):
             sha_branch = sha_branch.replace(remote + '/', '')
         return sha_branch
 
+    @_backup_previous_version
     def update(self):
         if not self.is_local:
             raise NotInstalled('{} is not installed'.format(self.name))
