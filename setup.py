@@ -25,7 +25,7 @@ setup(
     name='msm',
     version='0.6.3',
     packages=['msm'],
-    install_requires=['GitPython', 'typing', 'fasteners', 'pyyaml'],
+    install_requires=['GitPython', 'typing', 'fasteners', 'pyyaml', 'pako'],
     url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='Apache-2.0',
     author='jarbasAI, Matthew Scholefield',

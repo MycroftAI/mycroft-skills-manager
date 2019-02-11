@@ -38,6 +38,7 @@ from subprocess import PIPE, Popen
 from tempfile import mktemp, gettempdir
 from threading import Lock
 from typing import Callable
+from pako import PakoManager
 
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
@@ -242,28 +243,18 @@ class SkillEntry(object):
         return True
 
     def install_system_deps(self):
-        success = True
         self.run_requirements_sh()
-        system_packages = self.dependent_system_packages
+        system_packages = {
+            exe: packages.split()
+            for exe, packages in self.dependent_system_packages.items()
+        }
         LOG.info('Installing system requirements...')
-        all_deps = system_packages.pop('all', '').split()
-        for exe_name, install_line in system_packages.items():
-            if shutil.which(exe_name):
-                command = exe_name + ' ' + install_line
-                io = PIPE
-                if sys.stdout.isatty() and shutil.which('sudo'):
-                    io = None
-                    command = 'sudo ' + command
-                    print('Running command: ' + command)
-                    print('Requesting sudo...')
-                proc = Popen(command, stdout=io, stderr=io, shell=True)
-                status = proc.wait()
-                if status == 0:
-                    break
-                LOG.warning('Failed to install deps for {} on {}!'.format(
-                    self.name, exe_name
-                ))
-        else:
+        all_deps = system_packages.pop('all', [])
+        try:
+            manager = PakoManager()
+            success = manager.install(all_deps, overrides=system_packages)
+        except RuntimeError:
+            LOG.warning('Failed to find package manager.')
             success = False
         missing_exes = [
             exe for exe in self.dependencies.get('exes', [])
