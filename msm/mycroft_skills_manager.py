@@ -253,8 +253,8 @@ class MycroftSkillsManager(object):
                     func.__name__, skill.name
                 ))
 
-        with ThreadPool(100) as tp:
-            return (tp.map(run_item, skills))
+        with ThreadPool(20) as tp:
+            return tp.map(run_item, skills)
 
     @save_skills_data
     def install_defaults(self):
