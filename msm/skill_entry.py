@@ -214,9 +214,8 @@ class SkillEntry(object):
         LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
         pip_args = [
-            sys.executable, '-m', 'pip', 'install',
-            ' '.join(self.dependent_python_packages)
-        ]
+            sys.executable, '-m', 'pip', 'install'
+        ] + self.dependent_python_packages
         if constraints:
             pip_args += ['-c', constraints]
 
