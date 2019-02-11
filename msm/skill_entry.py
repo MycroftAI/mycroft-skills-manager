@@ -202,7 +202,7 @@ class SkillEntry(object):
                 sum(weight for weight, val in weights)
         )
 
-    def run_pip(self, constraints):
+    def run_pip(self, constraints=None):
         if not self.dependent_python_packages:
             return
 
