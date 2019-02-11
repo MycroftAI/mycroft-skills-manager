@@ -94,9 +94,6 @@ def _backup_previous_version(func: Callable=None):
 class SkillEntry(object):
     pip_lock = Lock()
     manifest_yml_format = {
-        'name': '',
-        'description': '',
-        'author': '',
         'dependencies': {
             'system': {},
             'exes': [],
