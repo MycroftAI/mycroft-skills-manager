@@ -324,8 +324,6 @@ class SkillEntry(object):
                 info = yaml.load(f)
                 self.verify_info(info, self.manifest_yml_format)
                 return info
-        else:
-            LOG.info(yml_path)
         return {}
 
     @lazy
