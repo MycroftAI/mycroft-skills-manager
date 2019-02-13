@@ -43,7 +43,7 @@ from pako import PakoManager
 from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
-    AlreadyRemoved, RemoveException, CloneException, NotInstalled
+    AlreadyRemoved, RemoveException, CloneException, NotInstalled, GitException
 from msm.util import Git
 
 LOG = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def _backup_previous_version(func: Callable=None):
             func(self, *args, **kwargs)
 
         # Modified skill or GitError should not restore working copy
-        except (SkillModified, GitError):
+        except (SkillModified, GitError, GitException):
             pass
         except Exception:
             LOG.info('Problem performing action. Restoring skill to '
