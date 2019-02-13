@@ -78,6 +78,10 @@ def _backup_previous_version(func: Callable=None):
             shutil.copytree(self.path, self.old_path)
         try:
             func(self, *args, **kwargs)
+
+        # Modified skill or GitError should not restore working copy
+        except (SkillModified, GitError):
+            pass
         except Exception:
             LOG.info('Problem performing action. Restoring skill to '
                      'previous state...')
