@@ -81,7 +81,7 @@ def _backup_previous_version(func: Callable=None):
 
         # Modified skill or GitError should not restore working copy
         except (SkillModified, GitError, GitException):
-            pass
+            raise
         except Exception:
             LOG.info('Problem performing action. Restoring skill to '
                      'previous state...')
