@@ -36,6 +36,16 @@ class GitException(MsmException):
     pass
 
 
+class GitAuthException(GitException):
+    def __repr__(self):
+        return self.__class__.__name__
+
+
+class MergeConflict(GitException):
+    def __repr__(self):
+        return self.__class__.__name__
+
+
 class SkillModified(MsmException):
     """
     Raised when a skill cannot be updated because
@@ -103,4 +113,10 @@ def git_to_msm_exceptions():
     try:
         yield
     except GitError as e:
-        raise GitException('Git command failed: {}'.format(repr(e))) from e
+        msg = getattr(e, 'stderr', str(e)).replace('stderr:', '').strip()
+        if 'Authentication failed for' in msg:
+            raise GitAuthException(msg) from e
+        if 'Not something we can merge' in msg or \
+                'Not possible to fast-forward':
+            raise MergeConflict(msg) from e
+        raise GitException(msg) from e
