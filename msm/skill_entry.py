@@ -245,7 +245,7 @@ class SkillEntry(object):
     def install_system_deps(self):
         self.run_requirements_sh()
         system_packages = {
-            exe: packages.split()
+            exe: (packages or '').split()
             for exe, packages in self.dependent_system_packages.items()
         }
         LOG.info('Installing system requirements...')
@@ -253,11 +253,11 @@ class SkillEntry(object):
         try:
             manager = PakoManager()
             success = manager.install(all_deps, overrides=system_packages)
-        except RuntimeError:
-            LOG.warning('Failed to find package manager.')
+        except RuntimeError as e:
+            LOG.warning('Failed to launch package manager: {}'.format(e))
             success = False
         missing_exes = [
-            exe for exe in self.dependencies.get('exes', [])
+            exe for exe in self.dependencies.get('exes') or []
             if not shutil.which(exe)
         ]
         if missing_exes:
@@ -300,6 +300,8 @@ class SkillEntry(object):
             raise SkillRequirementsException(e)
 
     def verify_info(self, info, fmt):
+        if not info:
+            return
         if not isinstance(info, type(fmt)):
             LOG.warning('Invalid value type manifest.yml for {}: {}'.format(
                 self.name, type(info)
@@ -323,12 +325,12 @@ class SkillEntry(object):
             with open(yml_path) as f:
                 info = yaml.load(f)
                 self.verify_info(info, self.manifest_yml_format)
-                return info
+                return info or {}
         return {}
 
     @lazy
     def dependencies(self):
-        return self.skill_info.get('dependencies', {})
+        return self.skill_info.get('dependencies') or {}
 
     @lazy
     def dependent_skills(self):
@@ -340,7 +342,7 @@ class SkillEntry(object):
                     skill = i.strip()
                     if skill:
                         skills.add(skill)
-        for i in self.dependencies.get('skill', []):
+        for i in self.dependencies.get('skill') or []:
             skills.add(i)
         return list(skills)
 
@@ -351,12 +353,12 @@ class SkillEntry(object):
         if exists(reqs):
             with open(reqs, "r") as f:
                 req_lines += f.readlines()
-        req_lines += self.dependencies.get('python', [])
+        req_lines += self.dependencies.get('python') or []
         return [i.split('=')[0] for i in req_lines if i]
 
     @lazy
     def dependent_system_packages(self):
-        return self.dependencies.get('system', {})
+        return self.dependencies.get('system') or {}
 
     def remove(self):
         if not self.is_local:
