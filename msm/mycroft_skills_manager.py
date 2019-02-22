@@ -180,6 +180,7 @@ class MycroftSkillsManager(object):
             entry['installed'] = time.time()
             entry['installation'] = 'installed'
             entry['status'] = 'active'
+            entry['beta'] = skill.is_beta
         except AlreadyInstalled:
             entry = None
             raise
