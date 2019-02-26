@@ -43,15 +43,15 @@ def build_skill_entry(name, origin, beta) -> dict:
     Returns:
         populated skills entry
     """
-    entry = {}
-    entry['name'] = name
-    entry['origin'] = origin
-    entry['beta'] = beta
-    entry['status'] = 'active'
-    entry['installed'] = 0
-    entry['updated'] = 0
-    entry['installation'] = 'installed'
-    return entry
+    return {
+        'name': name,
+        'origin': origin,
+        'beta': beta,
+        'status': 'active',
+        'installed': 0,
+        'updated': 0,
+        'installation': 'installed'
+    }
 
 
 def skills_data_hash(data):
