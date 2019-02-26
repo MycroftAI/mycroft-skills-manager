@@ -81,6 +81,7 @@ class MycroftSkillsManager(object):
 
         self.skills_data = None
         self.saving_handled = False
+        self.skills_data_hash = ''
         with self.lock:
             self.sync_skills_data()
 
@@ -157,7 +158,6 @@ class MycroftSkillsManager(object):
         self.skills_data = self.load_skills_data()
         if 'upgraded' in self.skills_data:
             self.skills_data.pop('upgraded')
-            self.skills_data_hash = ''
         else:
             self.skills_data_hash = skills_data_hash(self.skills_data)
 
