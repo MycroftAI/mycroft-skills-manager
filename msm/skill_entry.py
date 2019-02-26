@@ -354,7 +354,9 @@ class SkillEntry(object):
             with open(reqs, "r") as f:
                 req_lines += f.readlines()
         req_lines += self.dependencies.get('python') or []
-        return [i.split('=')[0] for i in req_lines if i]
+        # Strip comments
+        req_lines = [l.split('#')[0].strip() for l in req_lines]
+        return [i  for i in req_lines if i] # Strip empty lines
 
     @lazy
     def dependent_system_packages(self):
