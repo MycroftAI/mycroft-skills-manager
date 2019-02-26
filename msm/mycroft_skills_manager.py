@@ -19,14 +19,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import logging
-from glob import glob
-from itertools import chain
-from multiprocessing.pool import ThreadPool
-from os.path import expanduser, join, dirname, isdir
-from functools import wraps
 import time
 
+import logging
+from functools import wraps
+from glob import glob
+from multiprocessing.pool import ThreadPool
+from os.path import expanduser, join, dirname, isdir
 from typing import Dict, List
 
 from msm import GitException
@@ -37,7 +36,6 @@ from msm.skill_repo import SkillRepo
 from msm.skills_data import (build_skill_entry, get_skill_entry,
                              write_skills_data, load_skills_data,
                              skills_data_hash)
-
 from msm.util import MsmProcessLock
 
 LOG = logging.getLogger(__name__)
@@ -73,14 +71,16 @@ class MycroftSkillsManager(object):
     def __init__(self, platform='default', skills_dir=None, repo=None,
                  versioned=True):
         self.platform = platform
-        self.skills_dir = expanduser(skills_dir or '') \
-                          or self.DEFAULT_SKILLS_DIR
+        self.skills_dir = (
+                expanduser(skills_dir or '') or self.DEFAULT_SKILLS_DIR
+        )
         self.repo = repo or SkillRepo()
         self.versioned = versioned
         self.lock = MsmProcessLock()
 
         self.skills_data = None
         self.saving_handled = False
+        self.skills_data_hash = ''
         with self.lock:
             self.sync_skills_data()
 
@@ -157,7 +157,6 @@ class MycroftSkillsManager(object):
         self.skills_data = self.load_skills_data()
         if 'upgraded' in self.skills_data:
             self.skills_data.pop('upgraded')
-            self.skills_data_hash = ''
         else:
             self.skills_data_hash = skills_data_hash(self.skills_data)
 
@@ -261,6 +260,7 @@ class MycroftSkillsManager(object):
     @save_skills_data
     def install_defaults(self):
         """Installs the default skills, updates all others"""
+
         def install_or_update_skill(skill):
             if skill.is_local:
                 self.update(skill)
