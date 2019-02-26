@@ -166,6 +166,7 @@ class MycroftSkillsManager(object):
         data = data or self.skills_data
         if skills_data_hash(data) != self.skills_data_hash:
             write_skills_data(data)
+            self.skills_data_hash = skills_data_hash(data)
 
     @save_skills_data
     def install(self, param, author=None, constraints=None, origin=''):
@@ -180,6 +181,7 @@ class MycroftSkillsManager(object):
             entry['installed'] = time.time()
             entry['installation'] = 'installed'
             entry['status'] = 'active'
+            entry['beta'] = skill.is_beta
         except AlreadyInstalled:
             entry = None
             raise
