@@ -30,7 +30,7 @@ def get_skill_entry(name, skills_data) -> dict:
     for e in skills_data.get('skills', []):
         if e.get('name') == name:
             return e
-    return None
+    return {}
 
 
 def build_skill_entry(name, origin, beta) -> dict:
