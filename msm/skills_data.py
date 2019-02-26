@@ -2,8 +2,9 @@
     Functions related to manipulating the skills_data.json
 """
 
-from os.path import expanduser, isfile
 import json
+from os.path import expanduser, isfile
+
 
 def load_skills_data() -> dict:
     """Contains info on how skills should be updated"""
@@ -17,10 +18,12 @@ def load_skills_data() -> dict:
     else:
         return {}
 
+
 def write_skills_data(data: dict):
     skills_data_file = expanduser('~/.mycroft/skills.json')
     with open(skills_data_file, 'w') as f:
-        json.dump(data, f, indent=4, separators=(',',':'))
+        json.dump(data, f, indent=4, separators=(',', ':'))
+
 
 def get_skill_entry(name, skills_data) -> dict:
     """ Find a skill entry in the skills_data and returns it. """

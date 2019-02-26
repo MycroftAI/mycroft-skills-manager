@@ -66,8 +66,9 @@ def work_dir(directory):
         os.chdir(old_dir)
 
 
-def _backup_previous_version(func: Callable=None):
+def _backup_previous_version(func: Callable = None):
     """Private decorator to back up previous skill folder"""
+
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         self.old_path = None
@@ -217,9 +218,8 @@ class SkillEntry(object):
 
         LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
-        pip_args = [
-            sys.executable, '-m', 'pip', 'install'
-        ] + self.dependent_python_packages
+        pip_args = [sys.executable, '-m', 'pip', 'install']
+        pip_args += self.dependent_python_packages
         if constraints:
             pip_args += ['-c', constraints]
 
@@ -356,7 +356,7 @@ class SkillEntry(object):
         req_lines += self.dependencies.get('python') or []
         # Strip comments
         req_lines = [l.split('#')[0].strip() for l in req_lines]
-        return [i  for i in req_lines if i] # Strip empty lines
+        return [i for i in req_lines if i]  # Strip empty lines
 
     @lazy
     def dependent_system_packages(self):

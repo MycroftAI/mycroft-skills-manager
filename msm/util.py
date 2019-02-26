@@ -24,6 +24,7 @@ from os.path import exists
 from os import chmod
 from fasteners.process_lock import InterProcessLock
 
+
 class Git(git.cmd.Git):
     """Prevents asking for password for private repos"""
     env = {'GIT_ASKPASS': 'echo'}
@@ -33,6 +34,7 @@ class Git(git.cmd.Git):
             env = kwargs.pop('env', {})
             env.update(self.env)
             return super(Git, self).__getattr__(item)(*args, env=env, **kwargs)
+
         return wrapper
 
 
