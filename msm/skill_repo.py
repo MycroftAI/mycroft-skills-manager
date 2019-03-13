@@ -30,9 +30,20 @@ from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
 from msm.util import Git
 import logging
+import requests
 
 LOG = logging.getLogger(__name__)
 
+MYCROFT_SKILLS_DATA = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills-data"
+
+def load_skills_data(branch):
+    try:
+        market_info_url = (MYCROFT_SKILLS_DATA + "/" + branch +
+                           "/skill-metadata.json")
+        info = requests.get(market_info_url).json()
+        return {info[k]['repo'].lower(): info[k] for k in info}
+    except requests.HTTPError:
+        return {}
 
 class SkillRepo(object):
     def __init__(self, path=None, url=None, branch=None):
@@ -40,6 +51,7 @@ class SkillRepo(object):
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
         self.branch = branch or "19.02"
         self.repo_info = {}
+        self.skills_meta_info = load_skills_data(self.branch)
 
     def read_file(self, filename):
         with open(join(self.path, filename)) as f:
