@@ -109,11 +109,18 @@ class SkillEntry(object):
 
     def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
+        url = url[:-len('.git')] if url.endswith('.git') else url
         self.name = name
         self.path = path
         self.url = url
         self.sha = sha
         self.msm = msm
+        if msm:
+            u = url.lower()
+            self.meta_info = msm.repo.skills_meta_info.get(u, {})
+        else:
+            self.meta_info = {}
+
         self.author = self.extract_author(url) if url else ''
         self.id = self.extract_repo_id(url) if url else name
         self.is_local = exists(path)
