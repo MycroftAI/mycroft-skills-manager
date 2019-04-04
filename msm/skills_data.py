@@ -33,13 +33,14 @@ def get_skill_entry(name, skills_data) -> dict:
     return {}
 
 
-def build_skill_entry(name, origin, beta) -> dict:
+def build_skill_entry(name, origin, beta, skill_gid) -> dict:
     """ Create a new skill entry
     
     Arguments:
         name: skill name
         origin: the source of the installation
         beta: Boolean indicating wether the skill is in beta
+        skill_gid: skill global id
     Returns:
         populated skills entry
     """
@@ -50,7 +51,8 @@ def build_skill_entry(name, origin, beta) -> dict:
         'status': 'active',
         'installed': 0,
         'updated': 0,
-        'installation': 'installed'
+        'installation': 'installed',
+        'skill_gid': skill_gid
     }
 
 

@@ -152,6 +152,20 @@ class SkillEntry(object):
                 current_sha != skill_shas[self.name] or
                 mod)
 
+    @property
+    def skill_gid(self):
+        """ Format skill gid for the skill
+        
+        """
+        gid = ''
+        if self.is_dirty:
+                gid +='@|'
+        if self.meta_info != {}:
+            gid += self.meta_info['skill_gid']
+        else:
+            gid += '{}|{}'.format(self.name, self.msm.repo.branch)
+        return gid
+
     def __str__(self):
         return self.name
 
