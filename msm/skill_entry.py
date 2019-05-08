@@ -130,6 +130,42 @@ class SkillEntry(object):
     def is_beta(self):
         return not self.sha or self.sha == 'HEAD'
 
+    @property
+    def is_dirty(self):
+        """ True if different from the version in the mycroft-skills repo.
+
+        Considers a skill dirty if
+        - the checkedout sha doesn't match the mycroft-skills repo
+        - the skill doesn't exist in the mycroft-skills repo
+        - the skill is not a git repo
+        - has local modifications
+        """
+        try:
+            checkout = Git(self.path)
+            mod = checkout.status(porcelain=True, untracked_files='no') != ''
+            current_sha = checkout.rev_parse('HEAD')
+        except GitCommandError: # Not a git checkout
+            return True
+
+        skill_shas = {d[0]: d[3] for d in self.msm.repo.get_skill_data()}
+        return (self.name not in skill_shas or
+                current_sha != skill_shas[self.name] or
+                mod)
+
+    @property
+    def skill_gid(self):
+        """ Format skill gid for the skill
+        
+        """
+        gid = ''
+        if self.is_dirty:
+                gid +='@|'
+        if self.meta_info != {}:
+            gid += self.meta_info['skill_gid']
+        else:
+            gid += '{}|{}'.format(self.name, self.msm.repo.branch)
+        return gid
+
     def __str__(self):
         return self.name
 

@@ -40,7 +40,7 @@ from msm.util import MsmProcessLock
 
 LOG = logging.getLogger(__name__)
 
-CURRENT_SKILLS_DATA_VERSION = 1
+CURRENT_SKILLS_DATA_VERSION = 2
 
 
 def save_skills_data(func):
@@ -85,35 +85,56 @@ class MycroftSkillsManager(object):
             self.sync_skills_data()
 
     def __upgrade_skills_data(self, skills_data):
-        new = {}
+        local_skills = [s for s in self.list() if s.is_local]
         if skills_data.get('version', 0) == 0:
-            new['blacklist'] = []
-            new['version'] = 1
-            new['skills'] = []
-            local_skills = [s for s in self.list() if s.is_local]
-            default_skills = [s.name for s in self.list_defaults()]
-            for skill in local_skills:
-                if 'origin' in skills_data.get(skill.name, {}):
-                    origin = skills_data[skill.name]['origin']
-                elif skill.name in default_skills:
-                    origin = 'default'
-                elif skill.url:
-                    origin = 'cli'
-                else:
-                    origin = 'non-msm'
-                beta = skills_data.get(skill.name, {}).get('beta', False)
-                entry = build_skill_entry(skill.name, origin, beta)
-                entry['installed'] = \
-                    skills_data.get(skill.name, {}).get('installed') or 0
-                if isinstance(entry['installed'], bool):
-                    entry['installed'] = 0
+            skills_data = self.__upgrade_to_v1(skills_data, local_skills)
+        if skills_data['version'] == 1:
+            skills_data = self.__upgrade_to_v2(skills_data, local_skills)
+        return skills_data
 
-                entry['update'] = \
-                    skills_data.get(skill.name, {}).get('updated') or 0
+    def __upgrade_to_v1(self, skills_data, local_skills):
+        new = {
+            'blacklist': [],
+            'version': 1,
+            'skills': []
+        }
+        default_skills = [s.name for s in self.list_defaults()]
+        for skill in local_skills:
+            if 'origin' in skills_data.get(skill.name, {}):
+                origin = skills_data[skill.name]['origin']
+            elif skill.name in default_skills:
+                origin = 'default'
+            elif skill.url:
+                origin = 'cli'
+            else:
+                origin = 'non-msm'
+            beta = skills_data.get(skill.name, {}).get('beta', False)
+            entry = build_skill_entry(skill.name, origin, beta,
+                                      skill.skill_gid)
+            entry['installed'] = \
+                skills_data.get(skill.name, {}).get('installed') or 0
+            if isinstance(entry['installed'], bool):
+                entry['installed'] = 0
 
-                new['skills'].append(entry)
-            new['upgraded'] = True
+            entry['update'] = \
+                skills_data.get(skill.name, {}).get('updated') or 0
+
+            new['skills'].append(entry)
+        new['upgraded'] = True
         return new
+
+    def __upgrade_to_v2(self, skills_data, local_skills):
+        """ Upgrade to v2 of the skills.json format.
+
+        This adds the skill_gid field to skill entries.
+        """
+        local_skill_dict = {s.name: s for s in local_skills}
+
+        for s in skills_data['skills']:
+            skill_info = local_skill_dict[s['name']]
+            s['skill_gid'] = skill_info.skill_gid
+        skills_data['version'] = 2
+        return skills_data
 
     def curate_skills_data(self, skills_data):
         """ Sync skills_data with actual skills on disk. """
@@ -174,7 +195,8 @@ class MycroftSkillsManager(object):
             skill = param
         else:
             skill = self.find_skill(param, author)
-        entry = build_skill_entry(skill.name, origin, skill.is_beta)
+        entry = build_skill_entry(skill.name, origin, skill.is_beta,
+                                  skill.skill_gid)
         try:
             skill.install(constraints)
             entry['installed'] = time.time()
