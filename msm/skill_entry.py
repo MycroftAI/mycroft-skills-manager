@@ -145,6 +145,8 @@ class SkillEntry(object):
         - the skill is not a git repo
         - has local modifications
         """
+        if not exists(self.path):
+            return False
         try:
             checkout = Git(self.path)
             mod = checkout.status(porcelain=True, untracked_files='no') != ''
