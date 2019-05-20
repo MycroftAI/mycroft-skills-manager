@@ -110,7 +110,6 @@ class SkillEntry(object):
     def __init__(self, name, path, url='', sha='', msm=None):
         url = url.rstrip('/')
         url = url[:-len('.git')] if url.endswith('.git') else url
-        self.name = name
         self.path = path
         self.url = url
         self.sha = sha
@@ -120,9 +119,15 @@ class SkillEntry(object):
             self.meta_info = msm.repo.skills_meta_info.get(u, {})
         else:
             self.meta_info = {}
+        if name is not None:
+            self.name = name
+        elif 'name' in self.meta_info:
+            self.name = self.meta_info['name']
+        else:
+            self.name = basename(path)
 
         self.author = self.extract_author(url) if url else ''
-        self.id = self.extract_repo_id(url) if url else name
+        self.id = self.extract_repo_id(url) if url else self.name
         self.is_local = exists(path)
         self.old_path = None  # Path of previous version while upgrading
 
@@ -140,6 +145,8 @@ class SkillEntry(object):
         - the skill is not a git repo
         - has local modifications
         """
+        if not exists(self.path):
+            return False
         try:
             checkout = Git(self.path)
             mod = checkout.status(porcelain=True, untracked_files='no') != ''
@@ -155,7 +162,7 @@ class SkillEntry(object):
     @property
     def skill_gid(self):
         """ Format skill gid for the skill
-        
+
         """
         gid = ''
         if self.is_dirty:
@@ -179,7 +186,7 @@ class SkillEntry(object):
 
     @classmethod
     def from_folder(cls, path, msm=None):
-        return cls(basename(path), path, cls.find_git_url(path), msm=msm)
+        return cls(None, path, cls.find_git_url(path), msm=msm)
 
     @classmethod
     def create_path(cls, folder, url, name=''):
