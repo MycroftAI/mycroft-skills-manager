@@ -155,7 +155,8 @@ class MycroftSkillsManager(object):
                     origin = 'cli'
                 else:
                     origin = 'non-msm'
-                entry = build_skill_entry(skill.name, origin, False)
+                entry = build_skill_entry(skill.name, origin, False,
+                                          skill.skill_gid)
                 skills_data['skills'].append(entry)
 
         # Check for skills in the list that doesn't exist in the filesystem
