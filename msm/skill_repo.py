@@ -42,7 +42,7 @@ def load_skills_data(branch):
                            "/skill-metadata.json")
         info = requests.get(market_info_url).json()
         return {info[k]['repo'].lower(): info[k] for k in info}
-    except requests.HTTPError:
+    except (requests.HTTPError, requests.exceptions.ConnectionError):
         return {}
 
 class SkillRepo(object):
@@ -51,7 +51,10 @@ class SkillRepo(object):
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
         self.branch = branch or "19.02"
         self.repo_info = {}
-        self.skills_meta_info = load_skills_data(self.branch)
+        try:
+            self.skills_meta_info = load_skills_data(self.branch)
+        except Exception as e:
+            raise MsmException
 
     def read_file(self, filename):
         with open(join(self.path, filename)) as f:
