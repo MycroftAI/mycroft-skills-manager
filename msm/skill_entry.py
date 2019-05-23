@@ -170,7 +170,8 @@ class SkillEntry(object):
         if self.meta_info != {}:
             gid += self.meta_info['skill_gid']
         else:
-            gid += '{}|{}'.format(self.name, self.msm.repo.branch)
+            name = self.name.split('.')[0]
+            gid += '{}|{}'.format(name, self.msm.repo.branch)
         return gid
 
     def __str__(self):
