@@ -167,6 +167,13 @@ class MycroftSkillsManager(object):
                 remove_list.append(s)
         for skill in remove_list:
             skills_data['skills'].remove(skill)
+
+        # Update skill gids
+        for s in local_skills:
+            for e in skills_data['skills']:
+                if e['name'] == s.name:
+                    e['skill_gid'] = s.skill_gid
+
         return skills_data
 
     def load_skills_data(self) -> dict:
