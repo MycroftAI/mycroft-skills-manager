@@ -374,7 +374,7 @@ class SkillEntry(object):
         if exists(yml_path):
             LOG.info('Reading from manifest.yml')
             with open(yml_path) as f:
-                info = yaml.load(f)
+                info = yaml.safe_load(f)
                 self.verify_info(info, self.manifest_yml_format)
                 return info or {}
         return {}
