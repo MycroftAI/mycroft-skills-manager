@@ -21,7 +21,8 @@
 # under the License.
 from glob import glob
 from os import makedirs
-from os.path import exists, join, isdir, dirname, basename
+from os.path import exists, join, isdir, dirname, basename, normpath
+import json
 
 from git import Repo
 from git.exc import GitCommandError, GitError
@@ -36,14 +37,37 @@ LOG = logging.getLogger(__name__)
 
 MYCROFT_SKILLS_DATA = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills-data"
 
-def load_skills_data(branch):
+def load_skills_data(branch, path):
     try:
         market_info_url = (MYCROFT_SKILLS_DATA + "/" + branch +
                            "/skill-metadata.json")
         info = requests.get(market_info_url).json()
+        # Cache the received data
+        with open(path, 'w') as f:
+            try:
+                json.dump(info, f)
+            except Exception as e:
+                LOG.warning('Couldn\'t save cached version of '
+                            'skills-metadata.json')
         return {info[k]['repo'].lower(): info[k] for k in info}
     except (requests.HTTPError, requests.exceptions.ConnectionError):
+        pass
+    except Exception as e:
+        LOG.warning("Skill metadata couldn't be fetched ({})".format(repr(e)))
+
+    # Try to load cache if fetching failed
+    if exists(path):
+        with open(path) as f:
+            try:
+                info = json.load(f)
+            except Exception:
+                LOG.warning('skills-metadata cache exists but can\'t '
+                            'be parsed')
+                return {}
+        return {info[k]['repo'].lower(): info[k] for k in info}
+    else:
         return {}
+
 
 class SkillRepo(object):
     def __init__(self, path=None, url=None, branch=None):
@@ -52,9 +76,13 @@ class SkillRepo(object):
         self.branch = branch or "19.02"
         self.repo_info = {}
         try:
-            self.skills_meta_info = load_skills_data(self.branch)
+            skills_meta_cache = normpath(join(self.path,
+                                              '..', '.skills-meta.json'))
+            self.skills_meta_info = load_skills_data(self.branch,
+                                                     skills_meta_cache)
         except Exception as e:
-            raise MsmException
+            LOG.exception(repr(e))
+            self.skills_meta_info = {}
 
     def read_file(self, filename):
         with open(join(self.path, filename)) as f:
