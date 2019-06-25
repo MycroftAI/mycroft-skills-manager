@@ -161,17 +161,15 @@ class SkillEntry(object):
 
     @property
     def skill_gid(self):
-        """ Format skill gid for the skill
-
-        """
+        """ Format skill gid for the skill. """
         gid = ''
         if self.is_dirty:
-                gid +='@|'
+            gid += '@|'
         if self.meta_info != {}:
             gid += self.meta_info['skill_gid']
         else:
             name = self.name.split('.')[0]
-            gid += '{}|{}'.format(name, self.msm.repo.branch)
+            gid += name
         return gid
 
     def __str__(self):
