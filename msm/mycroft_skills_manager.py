@@ -270,7 +270,7 @@ class MycroftSkillsManager(object):
                     entry['updated'] = time.time()
 
     @save_skills_data
-    def apply(self, func, skills):
+    def apply(self, func, skills, max_threads=20):
         """Run a function on all skills in parallel"""
 
         def run_item(skill):
@@ -287,7 +287,7 @@ class MycroftSkillsManager(object):
                     func.__name__, skill.name
                 ))
 
-        with ThreadPool(20) as tp:
+        with ThreadPool(max_threads) as tp:
             return tp.map(run_item, skills)
 
     @save_skills_data
