@@ -65,7 +65,8 @@ def save_skills_data(func):
 
 
 class MycroftSkillsManager(object):
-    SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde'}
+    SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
+                    'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
 
     def __init__(self, platform='default', skills_dir=None, repo=None,
