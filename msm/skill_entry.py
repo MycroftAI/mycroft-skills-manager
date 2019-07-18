@@ -92,6 +92,10 @@ def _backup_previous_version(func: Callable = None):
                 shutil.copytree(self.old_path, self.path)
             self.is_local = exists(self.path)
             raise
+        finally:
+            # Remove temporary path if needed
+            if self.old_path and exists(self.old_path):
+                rmtree(self.old_path)
 
     return wrapper
 
