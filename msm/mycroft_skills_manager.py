@@ -97,15 +97,15 @@ class MycroftSkillsManager(object):
         with self.lock:
             self.sync_skills_data()
 
-    def __upgrade_skills_data(self, skills_data):
+    def _upgrade_skills_data(self, skills_data):
         local_skills = [s for s in self.skill_list if s.is_local]
         if skills_data.get('version', 0) == 0:
-            skills_data = self.__upgrade_to_v1(skills_data, local_skills)
+            skills_data = self._upgrade_to_v1(skills_data, local_skills)
         if skills_data['version'] == 1:
-            skills_data = self.__upgrade_to_v2(skills_data, local_skills)
+            skills_data = self._upgrade_to_v2(skills_data, local_skills)
         return skills_data
 
-    def __upgrade_to_v1(self, skills_data, local_skills):
+    def _upgrade_to_v1(self, skills_data, local_skills):
         new = {
             'blacklist': [],
             'version': 1,
@@ -136,7 +136,7 @@ class MycroftSkillsManager(object):
         new['upgraded'] = True
         return new
 
-    def __upgrade_to_v2(self, skills_data, local_skills):
+    def _upgrade_to_v2(self, skills_data, local_skills):
         """Upgrade to v2 of the skills.json format.
 
         This adds the skill_gid field to skill entries.
@@ -192,7 +192,7 @@ class MycroftSkillsManager(object):
     def load_skills_data(self) -> dict:
         skills_data = load_skills_data()
         if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
-            skills_data = self.__upgrade_skills_data(skills_data)
+            skills_data = self._upgrade_skills_data(skills_data)
         else:
             skills_data = self.curate_skills_data(skills_data)
         return skills_data
