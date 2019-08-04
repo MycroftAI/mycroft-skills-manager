@@ -19,6 +19,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+"""Install, remove, update and track the skills on a device
+
+MSM can be used on the command line but is also used by Mycroft core daemons.
+"""
 import time
 import logging
 from functools import wraps
@@ -133,7 +137,7 @@ class MycroftSkillsManager(object):
         return new
 
     def __upgrade_to_v2(self, skills_data, local_skills):
-        """ Upgrade to v2 of the skills.json format.
+        """Upgrade to v2 of the skills.json format.
 
         This adds the skill_gid field to skill entries.
         """
@@ -149,7 +153,7 @@ class MycroftSkillsManager(object):
         return skills_data
 
     def curate_skills_data(self, skills_data):
-        """ Sync skills_data with actual skills on disk. """
+        """Sync skills_data with actual skills on disk."""
         local_skills = [s for s in self.skill_list if s.is_local]
         default_skills = [s.name for s in self.list_defaults()]
         local_skill_names = [s.name for s in local_skills]
@@ -194,7 +198,7 @@ class MycroftSkillsManager(object):
         return skills_data
 
     def sync_skills_data(self):
-        """ Update internal skill_data_structure from disk. """
+        """Update internal skill_data_structure from disk."""
         self.skills_data = self.load_skills_data()
         if 'upgraded' in self.skills_data:
             self.skills_data.pop('upgraded')
