@@ -65,6 +65,7 @@ def save_skills_data(func):
 
 
 class MycroftSkillsManager(object):
+    _skill_list = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -86,7 +87,7 @@ class MycroftSkillsManager(object):
             self.sync_skills_data()
 
     def __upgrade_skills_data(self, skills_data):
-        local_skills = [s for s in self.list() if s.is_local]
+        local_skills = [s for s in self.skill_list if s.is_local]
         if skills_data.get('version', 0) == 0:
             skills_data = self.__upgrade_to_v1(skills_data, local_skills)
         if skills_data['version'] == 1:
@@ -142,7 +143,7 @@ class MycroftSkillsManager(object):
 
     def curate_skills_data(self, skills_data):
         """ Sync skills_data with actual skills on disk. """
-        local_skills = [s for s in self.list() if s.is_local]
+        local_skills = [s for s in self.skill_list if s.is_local]
         default_skills = [s.name for s in self.list_defaults()]
         local_skill_names = [s.name for s in local_skills]
         skills_data_skills = [s['name'] for s in skills_data['skills']]
@@ -227,6 +228,7 @@ class MycroftSkillsManager(object):
             # Store the entry in the list
             if entry:
                 self.skills_data['skills'].append(entry)
+                self._skill_list = None
 
     @save_skills_data
     def remove(self, param, author=None):
@@ -242,7 +244,7 @@ class MycroftSkillsManager(object):
         return
 
     def update_all(self):
-        local_skills = [skill for skill in self.list() if skill.is_local]
+        local_skills = [skill for skill in self.skill_list if skill.is_local]
 
         def update_skill(skill):
             entry = get_skill_entry(skill.name, self.skills_data)
@@ -269,6 +271,7 @@ class MycroftSkillsManager(object):
                 # On successful update update the update value
                 if entry:
                     entry['updated'] = time.time()
+                    self._skill_list = None
 
     @save_skills_data
     def apply(self, func, skills, max_threads=20):
@@ -305,8 +308,7 @@ class MycroftSkillsManager(object):
 
     def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""
-        skills = self.list()
-        name_to_skill = {skill.name: skill for skill in skills}
+        name_to_skill = {skill.name: skill for skill in self.skill_list}
         defaults = {group: [] for group in self.SKILL_GROUPS}
 
         for section_name, skill_names in self.repo.get_default_skill_names():
@@ -328,15 +330,32 @@ class MycroftSkillsManager(object):
         return skill_groups.get(self.platform,
                                 skill_groups.get('default', []))
 
-    def list(self):
+    @property
+    def skill_list(self):
+        """Getting a list of skills can take a while so cache it.
+
+        The list method is called several times in this class and in core.
+        Skill data on a device just doesn't change that frequently so
+        getting a fresh list that many times did not make a lot of sense.
+        The list method remains for any code that needs a fresh skill list.
+
+        Skill installs and updates will set the _skill_list class attribute
+        to None, which will cause this property to refresh next time is
+        is referenced.
         """
-        Load a list of SkillEntry objects from both local and
-        remote skills
+        if self._skill_list is None:
+            LOG.info('building list of skills')
+            self._skill_list = self.list()
+
+        return self._skill_list
+
+    def list(self):
+        """Load a list of SkillEntry objects from both local and remote skills
 
         It is necessary to load both local and remote skills at
         the same time to correctly associate local skills with the name
         in the repo and remote skills with any custom path that they
-        have been downloaded to
+        have been downloaded to.
         """
         try:
             self.repo.update()
@@ -368,7 +387,7 @@ class MycroftSkillsManager(object):
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
             repo_id = SkillEntry.extract_repo_id(param)
-            for skill in self.list():
+            for skill in self.skill_list:
                 if skill.id == repo_id:
                     return skill
             name = SkillEntry.extract_repo_name(param)
@@ -377,7 +396,7 @@ class MycroftSkillsManager(object):
         else:
             skill_confs = {
                 skill: skill.match(param, author)
-                for skill in skills or self.list()
+                for skill in skills or self.skill_list
             }
             best_skill, score = max(skill_confs.items(), key=lambda x: x[1])
             LOG.info('Best match ({}): {} by {}'.format(
