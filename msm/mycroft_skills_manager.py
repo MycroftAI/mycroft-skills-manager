@@ -20,7 +20,6 @@
 # specific language governing permissions and limitations
 # under the License.
 import time
-
 import logging
 from functools import wraps
 from glob import glob
@@ -29,13 +28,21 @@ from os.path import expanduser, join, dirname, isdir
 from typing import Dict, List
 
 from msm import GitException
-from msm.exceptions import (MsmException, SkillNotFound, MultipleSkillMatches,
-                            AlreadyInstalled)
+from msm.exceptions import (
+    MsmException,
+    SkillNotFound,
+    MultipleSkillMatches,
+    AlreadyInstalled
+)
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
-from msm.skills_data import (build_skill_entry, get_skill_entry,
-                             write_skills_data, load_skills_data,
-                             skills_data_hash)
+from msm.skills_data import (
+    build_skill_entry,
+    get_skill_entry,
+    write_skills_data,
+    load_skills_data,
+    skills_data_hash
+)
 from msm.util import MsmProcessLock
 
 LOG = logging.getLogger(__name__)
