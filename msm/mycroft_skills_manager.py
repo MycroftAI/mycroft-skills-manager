@@ -95,7 +95,7 @@ class MycroftSkillsManager(object):
         self.saving_handled = False
         self.skills_data_hash = ''
         with self.lock:
-            self.sync_skills_data()
+            self._init_skills_data()
 
     def _upgrade_skills_data(self, skills_data):
         local_skills = [s for s in self.skill_list if s.is_local]
@@ -150,6 +150,7 @@ class MycroftSkillsManager(object):
             else:
                 s['skill_gid'] = ''
         skills_data['version'] = 2
+        skills_data['upgraded'] = True
         return skills_data
 
     def curate_skills_data(self, skills_data):
@@ -197,16 +198,21 @@ class MycroftSkillsManager(object):
             skills_data = self.curate_skills_data(skills_data)
         return skills_data
 
-    def sync_skills_data(self):
-        """Update internal skill_data_structure from disk."""
+    def _init_skills_data(self):
+        """Load internal skill manifest from disk and update if needed.
+
+        If the skills manifest was upgraded after it was loaded, write the
+        updated manifest to disk.
+        """
         self.skills_data = self.load_skills_data()
         if 'upgraded' in self.skills_data:
             self.skills_data.pop('upgraded')
+            self.write_skills_data()
         else:
             self.skills_data_hash = skills_data_hash(self.skills_data)
 
     def write_skills_data(self, data=None):
-        """ Write skills data hash if it has been modified. """
+        """Write skills manifest to disk if it has been modified."""
         data = data or self.skills_data
         if skills_data_hash(data) != self.skills_data_hash:
             write_skills_data(data)
