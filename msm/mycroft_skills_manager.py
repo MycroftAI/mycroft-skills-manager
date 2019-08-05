@@ -47,11 +47,12 @@ from msm.skills_data import (
     load_skills_data,
     skills_data_hash
 )
-from msm.util import MsmProcessLock
+from msm.util import cached_property, MsmProcessLock
 
 LOG = logging.getLogger(__name__)
 
 CURRENT_SKILLS_DATA_VERSION = 2
+ONE_DAY = 86400
 
 
 def save_skills_data(func):
@@ -76,7 +77,7 @@ def save_skills_data(func):
 
 
 class MycroftSkillsManager(object):
-    _skill_list = None
+    _all_skills = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -97,8 +98,28 @@ class MycroftSkillsManager(object):
         with self.lock:
             self._init_skills_data()
 
+    @cached_property(ttl=ONE_DAY)
+    def all_skills(self):
+        """Getting a list of skills can take a while so cache it.
+
+        The list method is called several times in this class and in core.
+        Skill data on a device just doesn't change that frequently so
+        getting a fresh list that many times does not make a lot of sense.
+        The cache will expire every hour to pick up any changes in the
+        mycroft-skills repo.
+
+        Skill installs and updates will invalidate the cache, which will
+        cause this property to refresh next time is is referenced.
+
+        The list method can be called directly if a fresh skill list is needed.
+        """
+        if self._all_skills is None:
+            self._all_skills = self.list()
+
+        return self._all_skills
+
     def _upgrade_skills_data(self, skills_data):
-        local_skills = [s for s in self.skill_list if s.is_local]
+        local_skills = [s for s in self.all_skills if s.is_local]
         if skills_data.get('version', 0) == 0:
             skills_data = self._upgrade_to_v1(skills_data, local_skills)
         if skills_data['version'] == 1:
@@ -122,6 +143,7 @@ class MycroftSkillsManager(object):
             else:
                 origin = 'non-msm'
             beta = skills_data.get(skill.name, {}).get('beta', False)
+            LOG.info('building skill gid in upgrade to v1 for ' + skill.name)
             entry = build_skill_entry(skill.name, origin, beta,
                                       skill.skill_gid)
             entry['installed'] = \
@@ -155,7 +177,7 @@ class MycroftSkillsManager(object):
 
     def curate_skills_data(self, skills_data):
         """Sync skills_data with actual skills on disk."""
-        local_skills = [s for s in self.skill_list if s.is_local]
+        local_skills = [s for s in self.all_skills if s.is_local]
         default_skills = [s.name for s in self.list_defaults()]
         local_skill_names = [s.name for s in local_skills]
         skills_data_skills = [s['name'] for s in skills_data['skills']]
@@ -186,6 +208,7 @@ class MycroftSkillsManager(object):
         for s in local_skills:
             for e in skills_data['skills']:
                 if e['name'] == s.name:
+                    LOG.info('building skill gid in curate_skills_data 2 for ' + s.name)
                     e['skill_gid'] = s.skill_gid
 
         return skills_data
@@ -245,7 +268,7 @@ class MycroftSkillsManager(object):
             # Store the entry in the list
             if entry:
                 self.skills_data['skills'].append(entry)
-                self._skill_list = None
+                self._invalidate_skills_cache()
 
     @save_skills_data
     def remove(self, param, author=None):
@@ -255,19 +278,21 @@ class MycroftSkillsManager(object):
         else:
             skill = self.find_skill(param, author)
         skill.remove()
-        skills = [s for s in self.skills_data['skills']
-                  if s['name'] != skill.name]
+        skills = [
+            s for s in self.skills_data['skills'] if s['name'] != skill.name
+        ]
         self.skills_data['skills'] = skills
-        return
+        self._invalidate_skills_cache()
 
     def update_all(self):
-        local_skills = [skill for skill in self.skill_list if skill.is_local]
+        local_skills = [skill for skill in self.all_skills if skill.is_local]
 
         def update_skill(skill):
             entry = get_skill_entry(skill.name, self.skills_data)
             if entry:
                 entry['beta'] = skill.is_beta
             if skill.update():
+                self._invalidate_skills_cache()
                 if entry:
                     entry['updated'] = time.time()
 
@@ -288,7 +313,7 @@ class MycroftSkillsManager(object):
                 # On successful update update the update value
                 if entry:
                     entry['updated'] = time.time()
-                    self._skill_list = None
+                    self._invalidate_skills_cache()
 
     @save_skills_data
     def apply(self, func, skills, max_threads=20):
@@ -325,7 +350,7 @@ class MycroftSkillsManager(object):
 
     def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Returns {'skill_group': [SkillEntry('name')]}"""
-        name_to_skill = {skill.name: skill for skill in self.skill_list}
+        name_to_skill = {skill.name: skill for skill in self.all_skills}
         defaults = {group: [] for group in self.SKILL_GROUPS}
 
         for section_name, skill_names in self.repo.get_default_skill_names():
@@ -347,25 +372,6 @@ class MycroftSkillsManager(object):
         return skill_groups.get(self.platform,
                                 skill_groups.get('default', []))
 
-    @property
-    def skill_list(self):
-        """Getting a list of skills can take a while so cache it.
-
-        The list method is called several times in this class and in core.
-        Skill data on a device just doesn't change that frequently so
-        getting a fresh list that many times did not make a lot of sense.
-        The list method remains for any code that needs a fresh skill list.
-
-        Skill installs and updates will set the _skill_list class attribute
-        to None, which will cause this property to refresh next time is
-        is referenced.
-        """
-        if self._skill_list is None:
-            LOG.info('building list of skills')
-            self._skill_list = self.list()
-
-        return self._skill_list
-
     def list(self):
         """Load a list of SkillEntry objects from both local and remote skills
 
@@ -373,7 +379,12 @@ class MycroftSkillsManager(object):
         the same time to correctly associate local skills with the name
         in the repo and remote skills with any custom path that they
         have been downloaded to.
+
+        The return value of this function is cached in the all_skills property.
+        Only call this method if you need a fresh version of the SkillEntry
+        objects.
         """
+        LOG.info('building SkillEntry objects for all skills')
         try:
             self.repo.update()
         except GitException as e:
@@ -397,14 +408,29 @@ class MycroftSkillsManager(object):
                 skill.attach(remote_skills.pop(skill.id))
             all_skills.append(skill)
         all_skills += list(remote_skills.values())
+
+        self._invalidate_skills_cache(new_value=all_skills)
+
         return all_skills
+
+    def _invalidate_skills_cache(self, new_value=None):
+        """Reset the cached value in case something changed.
+
+        The cached_property decorator builds a _cache instance attribute
+        storing a dictionary of cached values.  Deleting from this attribute
+        invalidates the cache.
+        """
+        LOG.info('invalidating skills cache')
+        if hasattr(self, '_cache'):
+            del self._cache['all_skills']
+        self._all_skills = None if new_value is None else new_value
 
     def find_skill(self, param, author=None, skills=None):
         # type: (str, str, List[SkillEntry]) -> SkillEntry
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
             repo_id = SkillEntry.extract_repo_id(param)
-            for skill in self.skill_list:
+            for skill in self.all_skills:
                 if skill.id == repo_id:
                     return skill
             name = SkillEntry.extract_repo_name(param)
@@ -413,7 +439,7 @@ class MycroftSkillsManager(object):
         else:
             skill_confs = {
                 skill: skill.match(param, author)
-                for skill in skills or self.skill_list
+                for skill in skills or self.all_skills
             }
             best_skill, score = max(skill_confs.items(), key=lambda x: x[1])
             LOG.info('Best match ({}): {} by {}'.format(
