@@ -78,6 +78,7 @@ def save_skills_data(func):
 
 class MycroftSkillsManager(object):
     _all_skills = None
+    _local_skills = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -118,22 +119,31 @@ class MycroftSkillsManager(object):
 
         return self._all_skills
 
+    @property
+    def local_skills(self):
+        """Property containing a dictionary of local skills keyed by name."""
+        if self._local_skills is None:
+            self._local_skills = {
+                s.name: s for s in self.all_skills if s.is_local
+            }
+
+        return self._local_skills
+
     def _upgrade_skills_data(self, skills_data):
-        local_skills = [s for s in self.all_skills if s.is_local]
         if skills_data.get('version', 0) == 0:
-            skills_data = self._upgrade_to_v1(skills_data, local_skills)
+            skills_data = self._upgrade_to_v1(skills_data)
         if skills_data['version'] == 1:
-            skills_data = self._upgrade_to_v2(skills_data, local_skills)
+            skills_data = self._upgrade_to_v2(skills_data)
         return skills_data
 
-    def _upgrade_to_v1(self, skills_data, local_skills):
+    def _upgrade_to_v1(self, skills_data):
         new = {
             'blacklist': [],
             'version': 1,
             'skills': []
         }
         default_skills = [s.name for s in self.list_defaults()]
-        for skill in local_skills:
+        for skill in self.local_skills.values():
             if 'origin' in skills_data.get(skill.name, {}):
                 origin = skills_data[skill.name]['origin']
             elif skill.name in default_skills:
@@ -158,16 +168,14 @@ class MycroftSkillsManager(object):
         new['upgraded'] = True
         return new
 
-    def _upgrade_to_v2(self, skills_data, local_skills):
+    def _upgrade_to_v2(self, skills_data):
         """Upgrade to v2 of the skills.json format.
 
         This adds the skill_gid field to skill entries.
         """
-        local_skill_dict = {s.name: s for s in local_skills}
-
         for s in skills_data['skills']:
-            if s['name'] in local_skill_dict:
-                skill_info = local_skill_dict[s['name']]
+            if s['name'] in self.local_skills:
+                skill_info = self.local_skills[s['name']]
                 s['skill_gid'] = skill_info.skill_gid
             else:
                 s['skill_gid'] = ''
@@ -177,13 +185,11 @@ class MycroftSkillsManager(object):
 
     def curate_skills_data(self, skills_data):
         """Sync skills_data with actual skills on disk."""
-        local_skills = [s for s in self.all_skills if s.is_local]
         default_skills = [s.name for s in self.list_defaults()]
-        local_skill_names = [s.name for s in local_skills]
         skills_data_skills = [s['name'] for s in skills_data['skills']]
 
         # Check for skills that aren't in the list
-        for skill in local_skills:
+        for skill in self.local_skills.values():
             if skill.name not in skills_data_skills:
                 if skill.name in default_skills:
                     origin = 'default'
@@ -198,17 +204,16 @@ class MycroftSkillsManager(object):
         # Check for skills in the list that doesn't exist in the filesystem
         remove_list = []
         for s in skills_data.get('skills', []):
-            if (s['name'] not in local_skill_names and
+            if (s['name'] not in self.local_skills and
                     s['installation'] == 'installed'):
                 remove_list.append(s)
         for skill in remove_list:
             skills_data['skills'].remove(skill)
 
         # Update skill gids
-        for s in local_skills:
+        for s in self.local_skills.values():
             for e in skills_data['skills']:
                 if e['name'] == s.name:
-                    LOG.info('building skill gid in curate_skills_data 2 for ' + s.name)
                     e['skill_gid'] = s.skill_gid
 
         return skills_data
@@ -285,8 +290,6 @@ class MycroftSkillsManager(object):
         self._invalidate_skills_cache()
 
     def update_all(self):
-        local_skills = [skill for skill in self.all_skills if skill.is_local]
-
         def update_skill(skill):
             entry = get_skill_entry(skill.name, self.skills_data)
             if entry:
@@ -296,7 +299,7 @@ class MycroftSkillsManager(object):
                 if entry:
                     entry['updated'] = time.time()
 
-        return self.apply(update_skill, local_skills)
+        return self.apply(update_skill, self.local_skills.values())
 
     @save_skills_data
     def update(self, skill=None, author=None):
@@ -424,6 +427,7 @@ class MycroftSkillsManager(object):
         if hasattr(self, '_cache'):
             del self._cache['all_skills']
         self._all_skills = None if new_value is None else new_value
+        self._local_skills = None
 
     def find_skill(self, param, author=None, skills=None):
         # type: (str, str, List[SkillEntry]) -> SkillEntry
