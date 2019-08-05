@@ -78,6 +78,7 @@ def save_skills_data(func):
 
 class MycroftSkillsManager(object):
     _all_skills = None
+    _default_skills = None
     _local_skills = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
@@ -119,6 +120,47 @@ class MycroftSkillsManager(object):
 
         return self._all_skills
 
+    def list(self):
+        """Load a list of SkillEntry objects from both local and remote skills
+
+        It is necessary to load both local and remote skills at
+        the same time to correctly associate local skills with the name
+        in the repo and remote skills with any custom path that they
+        have been downloaded to.
+
+        The return value of this function is cached in the all_skills property.
+        Only call this method if you need a fresh version of the SkillEntry
+        objects.
+        """
+        LOG.info('building SkillEntry objects for all skills')
+        try:
+            self.repo.update()
+        except GitException as e:
+            if not isdir(self.repo.path):
+                raise
+            LOG.warning('Failed to update repo: {}'.format(repr(e)))
+        remote_skill_list = (
+            SkillEntry(
+                name, SkillEntry.create_path(self.skills_dir, url, name),
+                url, sha if self.versioned else '', msm=self
+            )
+            for name, path, url, sha in self.repo.get_skill_data()
+        )
+        remote_skills = {
+            skill.id: skill for skill in remote_skill_list
+        }
+        all_skills = []
+        for skill_file in glob(join(self.skills_dir, '*', '__init__.py')):
+            skill = SkillEntry.from_folder(dirname(skill_file), msm=self)
+            if skill.id in remote_skills:
+                skill.attach(remote_skills.pop(skill.id))
+            all_skills.append(skill)
+        all_skills += list(remote_skills.values())
+
+        self._invalidate_skills_cache(new_value=all_skills)
+
+        return all_skills
+
     @property
     def local_skills(self):
         """Property containing a dictionary of local skills keyed by name."""
@@ -128,6 +170,38 @@ class MycroftSkillsManager(object):
             }
 
         return self._local_skills
+
+    @property
+    def default_skills(self):
+        if self._default_skills is None:
+            default_skill_groups = self.list_all_defaults()
+            try:
+                default_skill_group = default_skill_groups[self.platform]
+            except KeyError:
+                LOG.error(
+                    'No default skill list found for platform "{}".  '
+                    'Using base list.'.format(self.platform)
+                )
+                default_skill_group = default_skill_groups.get('default', [])
+            self._default_skills = {s.name: s for s in default_skill_group}
+
+        return self._default_skills
+
+    def list_all_defaults(self) -> Dict[str, List[SkillEntry]]:
+        """Returns {'skill_group': [SkillEntry('name')]}"""
+        all_skills = {skill.name: skill for skill in self.all_skills}
+        default_skills = {group: [] for group in self.SKILL_GROUPS}
+
+        for group_name, skill_names in self.repo.get_default_skill_names():
+            group_skills = []
+            for skill_name in skill_names:
+                try:
+                    group_skills.append(all_skills[skill_name])
+                except KeyError:
+                    LOG.warning('No such default skill: ' + skill_name)
+            default_skills[group_name] = group_skills
+
+        return default_skills
 
     def _upgrade_skills_data(self, skills_data):
         if skills_data.get('version', 0) == 0:
@@ -142,11 +216,10 @@ class MycroftSkillsManager(object):
             'version': 1,
             'skills': []
         }
-        default_skills = [s.name for s in self.list_defaults()]
         for skill in self.local_skills.values():
             if 'origin' in skills_data.get(skill.name, {}):
                 origin = skills_data[skill.name]['origin']
-            elif skill.name in default_skills:
+            elif skill.name in self.default_skills:
                 origin = 'default'
             elif skill.url:
                 origin = 'cli'
@@ -185,13 +258,12 @@ class MycroftSkillsManager(object):
 
     def curate_skills_data(self, skills_data):
         """Sync skills_data with actual skills on disk."""
-        default_skills = [s.name for s in self.list_defaults()]
         skills_data_skills = [s['name'] for s in skills_data['skills']]
 
         # Check for skills that aren't in the list
         for skill in self.local_skills.values():
             if skill.name not in skills_data_skills:
-                if skill.name in default_skills:
+                if skill.name in self.default_skills:
                     origin = 'default'
                 elif skill.url:
                     origin = 'cli'
@@ -349,75 +421,13 @@ class MycroftSkillsManager(object):
             else:
                 self.install(skill, origin='default')
 
-        return self.apply(install_or_update_skill, self.list_defaults())
-
-    def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
-        """Returns {'skill_group': [SkillEntry('name')]}"""
-        name_to_skill = {skill.name: skill for skill in self.all_skills}
-        defaults = {group: [] for group in self.SKILL_GROUPS}
-
-        for section_name, skill_names in self.repo.get_default_skill_names():
-            section_skills = []
-            for skill_name in skill_names:
-                if skill_name in name_to_skill:
-                    section_skills.append(name_to_skill[skill_name])
-                else:
-                    LOG.warning('No such default skill: ' + skill_name)
-                defaults[section_name] = section_skills
-
-        return defaults
-
-    def list_defaults(self):
-        skill_groups = self.list_all_defaults()
-
-        if self.platform not in skill_groups:
-            LOG.error('Unknown platform:' + self.platform)
-        return skill_groups.get(self.platform,
-                                skill_groups.get('default', []))
-
-    def list(self):
-        """Load a list of SkillEntry objects from both local and remote skills
-
-        It is necessary to load both local and remote skills at
-        the same time to correctly associate local skills with the name
-        in the repo and remote skills with any custom path that they
-        have been downloaded to.
-
-        The return value of this function is cached in the all_skills property.
-        Only call this method if you need a fresh version of the SkillEntry
-        objects.
-        """
-        LOG.info('building SkillEntry objects for all skills')
-        try:
-            self.repo.update()
-        except GitException as e:
-            if not isdir(self.repo.path):
-                raise
-            LOG.warning('Failed to update repo: {}'.format(repr(e)))
-        remote_skill_list = (
-            SkillEntry(
-                name, SkillEntry.create_path(self.skills_dir, url, name),
-                url, sha if self.versioned else '', msm=self
-            )
-            for name, path, url, sha in self.repo.get_skill_data()
+        return self.apply(
+            install_or_update_skill,
+            self.default_skills.values()
         )
-        remote_skills = {
-            skill.id: skill for skill in remote_skill_list
-        }
-        all_skills = []
-        for skill_file in glob(join(self.skills_dir, '*', '__init__.py')):
-            skill = SkillEntry.from_folder(dirname(skill_file), msm=self)
-            if skill.id in remote_skills:
-                skill.attach(remote_skills.pop(skill.id))
-            all_skills.append(skill)
-        all_skills += list(remote_skills.values())
-
-        self._invalidate_skills_cache(new_value=all_skills)
-
-        return all_skills
 
     def _invalidate_skills_cache(self, new_value=None):
-        """Reset the cached value in case something changed.
+        """Reset the cached skill lists in case something changed.
 
         The cached_property decorator builds a _cache instance attribute
         storing a dictionary of cached values.  Deleting from this attribute
@@ -428,6 +438,7 @@ class MycroftSkillsManager(object):
             del self._cache['all_skills']
         self._all_skills = None if new_value is None else new_value
         self._local_skills = None
+        self._default_skills = None
 
     def find_skill(self, param, author=None, skills=None):
         # type: (str, str, List[SkillEntry]) -> SkillEntry
