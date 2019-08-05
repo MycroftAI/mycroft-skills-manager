@@ -107,7 +107,7 @@ class MycroftSkillsManager(object):
             self._init_skills_data()
 
     @cached_property(ttl=ONE_DAY)
-    def all_skills(self) -> List[SkillEntry]:
+    def all_skills(self):
         """Getting a list of skills can take a while so cache it.
 
         The list method is called several times in this class and in core.
@@ -168,7 +168,7 @@ class MycroftSkillsManager(object):
         return all_skills
 
     @property
-    def local_skills(self) -> Dict[str: SkillEntry]:
+    def local_skills(self):
         """Property containing a dictionary of local skills keyed by name."""
         if self._local_skills is None:
             self._local_skills = {
@@ -178,8 +178,7 @@ class MycroftSkillsManager(object):
         return self._local_skills
 
     @property
-    def default_skills(self) -> Dict[str: SkillEntry]:
-        """Property containing dictionary of default skills keyed by name."""
+    def default_skills(self):
         if self._default_skills is None:
             default_skill_groups = self.list_all_defaults()
             try:
@@ -194,7 +193,7 @@ class MycroftSkillsManager(object):
 
         return self._default_skills
 
-    def list_all_defaults(self) -> Dict[str, List[SkillEntry]]:
+    def list_all_defaults(self):  # type: () -> Dict[str, List[SkillEntry]]
         """Generate dictionary of default skills in all default skill groups"""
         all_skills = {skill.name: skill for skill in self.all_skills}
         default_skills = {group: [] for group in self.SKILL_GROUPS}
@@ -298,6 +297,14 @@ class MycroftSkillsManager(object):
 
         return skills_data
 
+    def load_skills_data(self) -> dict:
+        skills_data = load_skills_data()
+        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
+            skills_data = self._upgrade_skills_data(skills_data)
+        else:
+            skills_data = self.curate_skills_data(skills_data)
+        return skills_data
+
     def _init_skills_data(self):
         """Initial load of the skills manifest that occurs upon instantiation.
 
@@ -311,17 +318,7 @@ class MycroftSkillsManager(object):
         else:
             self.skills_data_hash = skills_data_hash(self.skills_data)
 
-    def load_skills_data(self) -> dict:
-        """Load internal skill manifest from disk and update if needed."""
-        skills_data = load_skills_data()
-        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
-            skills_data = self._upgrade_skills_data(skills_data)
-        else:
-            skills_data = self.curate_skills_data(skills_data)
-
-        return skills_data
-
-    def write_skills_data(self, data: dict = None):
+    def write_skills_data(self, data=None):
         """Write skills manifest to disk if it has been modified."""
         data = data or self.skills_data
         if skills_data_hash(data) != self.skills_data_hash:
@@ -372,7 +369,7 @@ class MycroftSkillsManager(object):
         self._invalidate_skills_cache()
 
     def update_all(self):
-        def update_skill(skill: SkillEntry):
+        def update_skill(skill):
             entry = get_skill_entry(skill.name, self.skills_data)
             if entry:
                 entry['beta'] = skill.is_beta
@@ -436,7 +433,7 @@ class MycroftSkillsManager(object):
             self.default_skills.values()
         )
 
-    def _invalidate_skills_cache(self, new_value: List[SkillEntry] = None):
+    def _invalidate_skills_cache(self, new_value=None):
         """Reset the cached skill lists in case something changed.
 
         The cached_property decorator builds a _cache instance attribute
@@ -450,12 +447,8 @@ class MycroftSkillsManager(object):
         self._local_skills = None
         self._default_skills = None
 
-    def find_skill(
-            self,
-            param: str,
-            author: str = None,
-            skills: List[SkillEntry] = None
-    ) -> SkillEntry:
+    def find_skill(self, param, author=None, skills=None):
+        # type: (str, str, List[SkillEntry]) -> SkillEntry
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
             repo_id = SkillEntry.extract_repo_id(param)
