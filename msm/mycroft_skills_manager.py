@@ -226,7 +226,6 @@ class MycroftSkillsManager(object):
             else:
                 origin = 'non-msm'
             beta = skills_data.get(skill.name, {}).get('beta', False)
-            LOG.info('building skill gid in upgrade to v1 for ' + skill.name)
             entry = build_skill_entry(skill.name, origin, beta,
                                       skill.skill_gid)
             entry['installed'] = \
