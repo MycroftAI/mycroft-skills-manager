@@ -56,6 +56,12 @@ ONE_DAY = 86400
 
 
 def save_skills_data(func):
+    """Decorator to write the skills.json file when skills manifest changes.
+
+    The methods decorated with this function are executed in threads.  So,
+    this contains some funky logic to keep the threads from stepping on one
+    another.
+    """
     @wraps(func)
     def func_wrapper(self, *args, **kwargs):
         will_save = False
@@ -101,7 +107,7 @@ class MycroftSkillsManager(object):
             self._init_skills_data()
 
     @cached_property(ttl=ONE_DAY)
-    def all_skills(self):
+    def all_skills(self) -> List[SkillEntry]:
         """Getting a list of skills can take a while so cache it.
 
         The list method is called several times in this class and in core.
@@ -162,7 +168,7 @@ class MycroftSkillsManager(object):
         return all_skills
 
     @property
-    def local_skills(self):
+    def local_skills(self) -> Dict[str: SkillEntry]:
         """Property containing a dictionary of local skills keyed by name."""
         if self._local_skills is None:
             self._local_skills = {
@@ -172,7 +178,8 @@ class MycroftSkillsManager(object):
         return self._local_skills
 
     @property
-    def default_skills(self):
+    def default_skills(self) -> Dict[str: SkillEntry]:
+        """Property containing dictionary of default skills keyed by name."""
         if self._default_skills is None:
             default_skill_groups = self.list_all_defaults()
             try:
@@ -188,7 +195,7 @@ class MycroftSkillsManager(object):
         return self._default_skills
 
     def list_all_defaults(self) -> Dict[str, List[SkillEntry]]:
-        """Returns {'skill_group': [SkillEntry('name')]}"""
+        """Generate dictionary of default skills in all default skill groups"""
         all_skills = {skill.name: skill for skill in self.all_skills}
         default_skills = {group: [] for group in self.SKILL_GROUPS}
 
@@ -204,6 +211,7 @@ class MycroftSkillsManager(object):
         return default_skills
 
     def _upgrade_skills_data(self, skills_data):
+        """Upgrade the contents of the skill manifest if needed."""
         if skills_data.get('version', 0) == 0:
             skills_data = self._upgrade_to_v1(skills_data)
         if skills_data['version'] == 1:
@@ -211,6 +219,7 @@ class MycroftSkillsManager(object):
         return skills_data
 
     def _upgrade_to_v1(self, skills_data):
+        """Upgrade the skills manifest data to version one."""
         new = {
             'blacklist': [],
             'version': 1,
@@ -241,7 +250,7 @@ class MycroftSkillsManager(object):
         return new
 
     def _upgrade_to_v2(self, skills_data):
-        """Upgrade to v2 of the skills.json format.
+        """Upgrade the skill manifest to version 2.
 
         This adds the skill_gid field to skill entries.
         """
@@ -289,16 +298,8 @@ class MycroftSkillsManager(object):
 
         return skills_data
 
-    def load_skills_data(self) -> dict:
-        skills_data = load_skills_data()
-        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
-            skills_data = self._upgrade_skills_data(skills_data)
-        else:
-            skills_data = self.curate_skills_data(skills_data)
-        return skills_data
-
     def _init_skills_data(self):
-        """Load internal skill manifest from disk and update if needed.
+        """Initial load of the skills manifest that occurs upon instantiation.
 
         If the skills manifest was upgraded after it was loaded, write the
         updated manifest to disk.
@@ -310,7 +311,17 @@ class MycroftSkillsManager(object):
         else:
             self.skills_data_hash = skills_data_hash(self.skills_data)
 
-    def write_skills_data(self, data=None):
+    def load_skills_data(self) -> dict:
+        """Load internal skill manifest from disk and update if needed."""
+        skills_data = load_skills_data()
+        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
+            skills_data = self._upgrade_skills_data(skills_data)
+        else:
+            skills_data = self.curate_skills_data(skills_data)
+
+        return skills_data
+
+    def write_skills_data(self, data: dict = None):
         """Write skills manifest to disk if it has been modified."""
         data = data or self.skills_data
         if skills_data_hash(data) != self.skills_data_hash:
@@ -361,7 +372,7 @@ class MycroftSkillsManager(object):
         self._invalidate_skills_cache()
 
     def update_all(self):
-        def update_skill(skill):
+        def update_skill(skill: SkillEntry):
             entry = get_skill_entry(skill.name, self.skills_data)
             if entry:
                 entry['beta'] = skill.is_beta
@@ -425,7 +436,7 @@ class MycroftSkillsManager(object):
             self.default_skills.values()
         )
 
-    def _invalidate_skills_cache(self, new_value=None):
+    def _invalidate_skills_cache(self, new_value: List[SkillEntry] = None):
         """Reset the cached skill lists in case something changed.
 
         The cached_property decorator builds a _cache instance attribute
@@ -439,8 +450,12 @@ class MycroftSkillsManager(object):
         self._local_skills = None
         self._default_skills = None
 
-    def find_skill(self, param, author=None, skills=None):
-        # type: (str, str, List[SkillEntry]) -> SkillEntry
+    def find_skill(
+            self,
+            param: str,
+            author: str = None,
+            skills: List[SkillEntry] = None
+    ) -> SkillEntry:
         """Find skill by name or url"""
         if param.startswith('https://') or param.startswith('http://'):
             repo_id = SkillEntry.extract_repo_id(param)
