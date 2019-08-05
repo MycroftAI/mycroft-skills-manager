@@ -520,6 +520,10 @@ class SkillEntry(object):
     def find_git_url(path):
         """Get the git url from a folder"""
         try:
+            LOG.debug(
+                'Attempting to retrieve the remote origin URL config for '
+                'skill in path ' + path
+            )
             return Git(path).config('remote.origin.url')
         except GitError:
             return ''
