@@ -404,7 +404,6 @@ class MycroftSkillsManager(object):
                 remaining_skills.append(skill)
         self.device_skill_state['skills'] = remaining_skills
         self._invalidate_skills_cache()
-        self._device_skill_state = None
 
     def update_all(self):
         def update_skill(skill):
@@ -435,7 +434,6 @@ class MycroftSkillsManager(object):
                 if skill_state:
                     skill_state['updated'] = time.time()
                     self._invalidate_skills_cache()
-                    self._device_skill_state = None
 
     @save_device_skill_state
     def apply(self, func, skills, max_threads=20):
