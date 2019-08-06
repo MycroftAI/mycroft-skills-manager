@@ -147,6 +147,7 @@ class MycroftSkillsManager(object):
         return all_skills
 
     def _refresh_skill_repo(self):
+        """Get the latest mycroft-skills repo code."""
         try:
             self.repo.update()
         except GitException as e:
@@ -155,24 +156,26 @@ class MycroftSkillsManager(object):
             LOG.warning('Failed to update repo: {}'.format(repr(e)))
 
     def _get_remote_skills(self):
-        remote_skill_list = (
-            SkillEntry(
-                name, SkillEntry.create_path(self.skills_dir, url, name),
-                url, sha if self.versioned else '', msm=self
+        """Build a dictionary of skills in mycroft-skills repo keyed by id"""
+        remote_skills = []
+        for name, _, url, sha in self.repo.get_skill_data():
+            skill_dir = SkillEntry.create_path(self.skills_dir, url, name)
+            sha = sha if self.versioned else ''
+            remote_skills.append(
+                SkillEntry(name, skill_dir, url, sha, msm=self)
             )
-            for name, skill_dir, url, sha in self.repo.get_skill_data()
-        )
 
-        return {skill.id: skill for skill in remote_skill_list}
+        return {skill.id: skill for skill in remote_skills}
 
     def _merge_remote_with_local(self, remote_skills):
+        """Merge the skills found in the repo with those installed locally."""
         all_skills = []
         for skill_file in glob(path.join(self.skills_dir, '*', '__init__.py')):
             skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self)
             if skill.id in remote_skills:
                 skill.attach(remote_skills.pop(skill.id))
             all_skills.append(skill)
-        all_skills += list(remote_skills.values())
+        all_skills.extend(remote_skills.values())
 
         return all_skills
 
