@@ -86,6 +86,7 @@ class MycroftSkillsManager(object):
     _all_skills = None
     _default_skills = None
     _local_skills = None
+    _skills_data = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -100,7 +101,6 @@ class MycroftSkillsManager(object):
         self.versioned = versioned
         self.lock = MsmProcessLock()
 
-        self.skills_data = None
         self.saving_handled = False
         self.skills_data_hash = ''
         with self.lock:
@@ -209,114 +209,117 @@ class MycroftSkillsManager(object):
 
         return default_skills
 
-    def _upgrade_skills_data(self, skills_data):
-        """Upgrade the contents of the skill manifest if needed."""
-        if skills_data.get('version', 0) == 0:
-            skills_data = self._upgrade_to_v1(skills_data)
-        if skills_data['version'] == 1:
-            skills_data = self._upgrade_to_v2(skills_data)
-        return skills_data
-
-    def _upgrade_to_v1(self, skills_data):
-        """Upgrade the skills manifest data to version one."""
-        new = {
-            'blacklist': [],
-            'version': 1,
-            'skills': []
-        }
-        for skill in self.local_skills.values():
-            if 'origin' in skills_data.get(skill.name, {}):
-                origin = skills_data[skill.name]['origin']
-            elif skill.name in self.default_skills:
-                origin = 'default'
-            elif skill.url:
-                origin = 'cli'
-            else:
-                origin = 'non-msm'
-            beta = skills_data.get(skill.name, {}).get('beta', False)
-            entry = build_skill_entry(skill.name, origin, beta,
-                                      skill.skill_gid)
-            entry['installed'] = \
-                skills_data.get(skill.name, {}).get('installed') or 0
-            if isinstance(entry['installed'], bool):
-                entry['installed'] = 0
-
-            entry['update'] = \
-                skills_data.get(skill.name, {}).get('updated') or 0
-
-            new['skills'].append(entry)
-        new['upgraded'] = True
-        return new
-
-    def _upgrade_to_v2(self, skills_data):
-        """Upgrade the skill manifest to version 2.
-
-        This adds the skill_gid field to skill entries.
-        """
-        for s in skills_data['skills']:
-            if s['name'] in self.local_skills:
-                skill_info = self.local_skills[s['name']]
-                s['skill_gid'] = skill_info.skill_gid
-            else:
-                s['skill_gid'] = ''
-        skills_data['version'] = 2
-        skills_data['upgraded'] = True
-        return skills_data
-
-    def curate_skills_data(self, skills_data):
-        """Sync skills_data with actual skills on disk."""
-        skills_data_skills = [s['name'] for s in skills_data['skills']]
-
-        # Check for skills that aren't in the list
-        for skill in self.local_skills.values():
-            if skill.name not in skills_data_skills:
-                if skill.name in self.default_skills:
-                    origin = 'default'
-                elif skill.url:
-                    origin = 'cli'
-                else:
-                    origin = 'non-msm'
-                entry = build_skill_entry(skill.name, origin, False,
-                                          skill.skill_gid)
-                skills_data['skills'].append(entry)
-
-        # Check for skills in the list that doesn't exist in the filesystem
-        remove_list = []
-        for s in skills_data.get('skills', []):
-            if (s['name'] not in self.local_skills and
-                    s['installation'] == 'installed'):
-                remove_list.append(s)
-        for skill in remove_list:
-            skills_data['skills'].remove(skill)
-
-        # Update skill gids
-        for s in self.local_skills.values():
-            for e in skills_data['skills']:
-                if e['name'] == s.name:
-                    e['skill_gid'] = s.skill_gid
-
-        return skills_data
-
-    def load_skills_data(self) -> dict:
-        skills_data = load_skills_data()
-        if skills_data.get('version', 0) < CURRENT_SKILLS_DATA_VERSION:
-            skills_data = self._upgrade_skills_data(skills_data)
-        else:
-            skills_data = self.curate_skills_data(skills_data)
-        return skills_data
-
     def _init_skills_data(self):
         """Initial load of the skills manifest that occurs upon instantiation.
 
         If the skills manifest was upgraded after it was loaded, write the
         updated manifest to disk.
         """
-        self.skills_data = self.load_skills_data()
-        if 'upgraded' in self.skills_data:
-            self.skills_data.pop('upgraded')
-            self.write_skills_data()
-        else:
+        try:
+            del(self.skills_data['upgraded'])
+        except KeyError:
             self.skills_data_hash = skills_data_hash(self.skills_data)
+        except Exception:
+            LOG.exception('init_skills_data failed')
+        else:
+            self.write_skills_data()
+
+    @property
+    def skills_data(self):
+        if self._skills_data is None:
+            self._skills_data = load_skills_data()
+            skills_data_version = self._skills_data.get('version', 0)
+            if skills_data_version < CURRENT_SKILLS_DATA_VERSION:
+                self._upgrade_skills_data()
+            else:
+                self.curate_skills_data()
+
+        return self._skills_data
+
+    def _upgrade_skills_data(self):
+        """Upgrade the contents of the skill manifest if needed."""
+        if self._skills_data.get('version', 0) == 0:
+            self._upgrade_to_v1()
+        if self._skills_data['version'] == 1:
+            self._upgrade_to_v2()
+
+    def _upgrade_to_v1(self):
+        """Upgrade the skills manifest data to version one."""
+        self._skills_data.update(blacklist=[], version=1, skills=[])
+        for skill in self.local_skills.values():
+            skill_data = self._skills_data.get(skill.name, {})
+            try:
+                origin = skill_data['origin']
+            except KeyError:
+                origin = self._determine_skill_origin(skill)
+            beta = skill_data.get('beta', False)
+            entry = build_skill_entry(
+                skill.name,
+                origin,
+                beta,
+                skill.skill_gid
+            )
+            entry['installed'] = skill_data.get('installed', 0)
+            if isinstance(entry['installed'], bool):
+                entry['installed'] = 0
+            entry['updated'] = skill_data.get('updated', 0)
+            self._skills_data['skills'].append(entry)
+        self._skills_data.update(upgraded=True)
+
+    def _upgrade_to_v2(self):
+        """Upgrade the skill manifest to version 2.
+
+        This adds the skill_gid field to skill entries.
+        """
+        self._update_skill_gid()
+        self._skills_data.update(version=2, upgraded=True)
+
+    def curate_skills_data(self):
+        """Sync skills_data with actual skills on disk."""
+        self._add_skills_to_state()
+        self._remove_skills_from_state()
+        self._update_skill_gid()
+
+    def _add_skills_to_state(self):
+        """Add local skill to state if it is not already there."""
+        skill_names = [s['name'] for s in self._skills_data['skills']]
+        for skill in self.local_skills.values():
+            if skill.name not in skill_names:
+                origin = self._determine_skill_origin(skill)
+                entry = build_skill_entry(
+                    skill.name,
+                    origin,
+                    False,
+                    skill.skill_gid
+                )
+                self._skills_data['skills'].append(entry)
+
+    def _remove_skills_from_state(self):
+        """Remove skills from state that no longer exist in the filesystem."""
+        for skill in self._skills_data['skills']:
+            is_not_local = skill['name'] not in self.local_skills
+            is_installed_state = skill['installation'] == 'installed'
+            if is_not_local and is_installed_state:
+                self._skills_data['skills'].remove(skill)
+
+    def _update_skill_gid(self):
+        for skill in self._skills_data['skills']:
+            try:
+                local_skill = self.local_skills[skill['name']]
+            except KeyError:
+                skill['skill_gid'] = ''
+            else:
+                skill['skill_gid'] = local_skill.skill_gid
+
+    def _determine_skill_origin(self, skill):
+        if skill.name in self.default_skills:
+            origin = 'default'
+        elif skill.url:
+            origin = 'cli'
+        else:
+            origin = 'non-msm'
+
+        return origin
 
     def write_skills_data(self, data=None):
         """Write skills manifest to disk if it has been modified."""
