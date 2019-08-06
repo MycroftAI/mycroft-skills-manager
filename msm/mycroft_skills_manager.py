@@ -356,6 +356,7 @@ class MycroftSkillsManager(object):
             if entry:
                 self.skills_data['skills'].append(entry)
                 self._invalidate_skills_cache()
+                self._skills_data = None
 
     @save_skills_data
     def remove(self, param, author=None):
@@ -370,6 +371,7 @@ class MycroftSkillsManager(object):
         ]
         self.skills_data['skills'] = skills
         self._invalidate_skills_cache()
+        self._skills_data = None
 
     def update_all(self):
         def update_skill(skill):
@@ -378,6 +380,7 @@ class MycroftSkillsManager(object):
                 entry['beta'] = skill.is_beta
             if skill.update():
                 self._invalidate_skills_cache()
+                self._skills_data = None
                 if entry:
                     entry['updated'] = time.time()
 
@@ -399,6 +402,7 @@ class MycroftSkillsManager(object):
                 if entry:
                     entry['updated'] = time.time()
                     self._invalidate_skills_cache()
+                    self._skills_data = None
 
     @save_skills_data
     def apply(self, func, skills, max_threads=20):
