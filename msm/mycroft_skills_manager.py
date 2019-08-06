@@ -40,12 +40,12 @@ from msm.exceptions import (
 )
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
-from msm.skills_data import (
-    build_skill_entry,
-    get_skill_entry,
-    write_skills_data,
-    load_skills_data,
-    skills_data_hash
+from msm.skill_state import (
+    initialize_skill_state,
+    get_skill_state,
+    write_device_skill_state,
+    load_device_skill_state,
+    device_skill_state_hash
 )
 from msm.util import cached_property, MsmProcessLock
 
@@ -55,8 +55,8 @@ CURRENT_SKILLS_DATA_VERSION = 2
 ONE_DAY = 86400
 
 
-def save_skills_data(func):
-    """Decorator to write the skills.json file when skills manifest changes.
+def save_device_skill_state(func):
+    """Decorator to overwrite the skills.json file when skill state changes.
 
     The methods decorated with this function are executed in threads.  So,
     this contains some funky logic to keep the threads from stepping on one
@@ -71,7 +71,7 @@ def save_skills_data(func):
             ret = func(self, *args, **kwargs)
             # Write only if no exception occurs
             if will_save:
-                self.write_skills_data()
+                self.write_device_skill_state()
         finally:
             # Always restore saving_handled flag
             if will_save:
@@ -86,7 +86,7 @@ class MycroftSkillsManager(object):
     _all_skills = None
     _default_skills = None
     _local_skills = None
-    _skills_data = None
+    _device_skill_state = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -102,7 +102,7 @@ class MycroftSkillsManager(object):
         self.lock = MsmProcessLock()
 
         self.saving_handled = False
-        self.skills_data_hash = ''
+        self.device_skill_state_hash = ''
         with self.lock:
             self._init_skills_data()
 
@@ -222,100 +222,103 @@ class MycroftSkillsManager(object):
         return default_skills
 
     def _init_skills_data(self):
-        """Initial load of the skills manifest that occurs upon instantiation.
+        """Initial load of the skill state that occurs upon instantiation.
 
-        If the skills manifest was upgraded after it was loaded, write the
-        updated manifest to disk.
+        If the skills state was upgraded after it was loaded, write the
+        updated skills state to disk.
         """
         try:
-            del(self.skills_data['upgraded'])
+            del(self.device_skill_state['upgraded'])
         except KeyError:
-            self.skills_data_hash = skills_data_hash(self.skills_data)
+            self.device_skill_state_hash = device_skill_state_hash(
+                self.device_skill_state
+            )
         except Exception:
             LOG.exception('init_skills_data failed')
         else:
-            self.write_skills_data()
+            self.write_device_skill_state()
 
     @property
-    def skills_data(self):
-        if self._skills_data is None:
-            self._skills_data = load_skills_data()
-            skills_data_version = self._skills_data.get('version', 0)
+    def device_skill_state(self):
+        """Dictionary representing the state of skills on a device."""
+        if self._device_skill_state is None:
+            self._device_skill_state = load_device_skill_state()
+            skills_data_version = self._device_skill_state.get('version', 0)
             if skills_data_version < CURRENT_SKILLS_DATA_VERSION:
                 self._upgrade_skills_data()
             else:
-                self.curate_skills_data()
+                self._sync_device_skill_state()
 
-        return self._skills_data
+        return self._device_skill_state
 
     def _upgrade_skills_data(self):
-        """Upgrade the contents of the skill manifest if needed."""
-        if self._skills_data.get('version', 0) == 0:
+        """Upgrade the contents of the device skills state if needed."""
+        if self._device_skill_state.get('version', 0) == 0:
             self._upgrade_to_v1()
-        if self._skills_data['version'] == 1:
+        if self._device_skill_state['version'] == 1:
             self._upgrade_to_v2()
 
     def _upgrade_to_v1(self):
-        """Upgrade the skills manifest data to version one."""
-        self._skills_data.update(blacklist=[], version=1, skills=[])
+        """Upgrade the device skills state to version one."""
+        self._device_skill_state.update(blacklist=[], version=1, skills=[])
         for skill in self.local_skills.values():
-            skill_data = self._skills_data.get(skill.name, {})
+            skill_data = self._device_skill_state.get(skill.name, {})
             try:
                 origin = skill_data['origin']
             except KeyError:
                 origin = self._determine_skill_origin(skill)
             beta = skill_data.get('beta', False)
-            entry = build_skill_entry(
+            skill_state = initialize_skill_state(
                 skill.name,
                 origin,
                 beta,
                 skill.skill_gid
             )
-            entry['installed'] = skill_data.get('installed', 0)
-            if isinstance(entry['installed'], bool):
-                entry['installed'] = 0
-            entry['updated'] = skill_data.get('updated', 0)
-            self._skills_data['skills'].append(entry)
-        self._skills_data.update(upgraded=True)
+            skill_state['installed'] = skill_data.get('installed', 0)
+            if isinstance(skill_state['installed'], bool):
+                skill_state['installed'] = 0
+            skill_state['updated'] = skill_data.get('updated', 0)
+            self._device_skill_state['skills'].append(skill_state)
+        self._device_skill_state.update(upgraded=True)
 
     def _upgrade_to_v2(self):
-        """Upgrade the skill manifest to version 2.
+        """Upgrade the device skills state to version 2.
 
         This adds the skill_gid field to skill entries.
         """
         self._update_skill_gid()
-        self._skills_data.update(version=2, upgraded=True)
+        self._device_skill_state.update(version=2, upgraded=True)
 
-    def curate_skills_data(self):
-        """Sync skills_data with actual skills on disk."""
+    def _sync_device_skill_state(self):
+        """Sync device's skill state with with actual skills on disk."""
         self._add_skills_to_state()
         self._remove_skills_from_state()
         self._update_skill_gid()
 
     def _add_skills_to_state(self):
         """Add local skill to state if it is not already there."""
-        skill_names = [s['name'] for s in self._skills_data['skills']]
+        skill_names = [s['name'] for s in self._device_skill_state['skills']]
         for skill in self.local_skills.values():
             if skill.name not in skill_names:
                 origin = self._determine_skill_origin(skill)
-                entry = build_skill_entry(
+                skill_state = initialize_skill_state(
                     skill.name,
                     origin,
                     False,
                     skill.skill_gid
                 )
-                self._skills_data['skills'].append(entry)
+                self._device_skill_state['skills'].append(skill_state)
 
     def _remove_skills_from_state(self):
         """Remove skills from state that no longer exist in the filesystem."""
-        for skill in self._skills_data['skills']:
+        for skill in self._device_skill_state['skills']:
             is_not_local = skill['name'] not in self.local_skills
             is_installed_state = skill['installation'] == 'installed'
             if is_not_local and is_installed_state:
-                self._skills_data['skills'].remove(skill)
+                self._device_skill_state['skills'].remove(skill)
 
     def _update_skill_gid(self):
-        for skill in self._skills_data['skills']:
+        for skill in self._device_skill_state['skills']:
             try:
                 local_skill = self.local_skills[skill['name']]
             except KeyError:
@@ -333,44 +336,53 @@ class MycroftSkillsManager(object):
 
         return origin
 
-    def write_skills_data(self, data=None):
-        """Write skills manifest to disk if it has been modified."""
-        data = data or self.skills_data
-        if skills_data_hash(data) != self.skills_data_hash:
-            write_skills_data(data)
-            self.skills_data_hash = skills_data_hash(data)
+    def write_device_skill_state(self, data=None):
+        """Write device's skill state to disk if it has been modified."""
+        data = data or self.device_skill_state
+        if device_skill_state_hash(data) != self.device_skill_state_hash:
+            write_device_skill_state(data)
+            self.device_skill_state_hash = device_skill_state_hash(data)
 
-    @save_skills_data
+    @save_device_skill_state
     def install(self, param, author=None, constraints=None, origin=''):
         """Install by url or name"""
         if isinstance(param, SkillEntry):
             skill = param
         else:
             skill = self.find_skill(param, author)
-        entry = build_skill_entry(skill.name, origin, skill.is_beta,
-                                  skill.skill_gid)
+        skill_state = initialize_skill_state(
+            skill.name,
+            origin,
+            skill.is_beta,
+            skill.skill_gid
+        )
         try:
             skill.install(constraints)
-            entry['installed'] = time.time()
-            entry['installation'] = 'installed'
-            entry['status'] = 'active'
-            entry['beta'] = skill.is_beta
         except AlreadyInstalled:
-            entry = None
+            skill_state = None
             raise
         except MsmException as e:
-            entry['installation'] = 'failed'
-            entry['status'] = 'error'
-            entry['failure_message'] = repr(e)
+            skill_state.update(
+                installation='failed',
+                status='error',
+                failure_message=repr(e)
+            )
             raise
+        else:
+            skill_state.update(
+                installed=time.time(),
+                installation='installed',
+                status='active',
+                beta=skill.is_beta
+            )
         finally:
             # Store the entry in the list
-            if entry:
-                self.skills_data['skills'].append(entry)
+            if skill_state:
+                self.device_skill_state['skills'].append(skill_state)
                 self._invalidate_skills_cache()
-                self._skills_data = None
+                self._device_skill_state = None
 
-    @save_skills_data
+    @save_device_skill_state
     def remove(self, param, author=None):
         """Remove by url or name"""
         if isinstance(param, SkillEntry):
@@ -378,27 +390,28 @@ class MycroftSkillsManager(object):
         else:
             skill = self.find_skill(param, author)
         skill.remove()
-        skills = [
-            s for s in self.skills_data['skills'] if s['name'] != skill.name
-        ]
-        self.skills_data['skills'] = skills
+        remaining_skills = []
+        for skill in self.device_skill_state['skills']:
+            if skill['name'] != skill.name:
+                remaining_skills.append(skill)
+        self.device_skill_state['skills'] = remaining_skills
         self._invalidate_skills_cache()
-        self._skills_data = None
+        self._device_skill_state = None
 
     def update_all(self):
         def update_skill(skill):
-            entry = get_skill_entry(skill.name, self.skills_data)
+            entry = get_skill_state(skill.name, self.device_skill_state)
             if entry:
                 entry['beta'] = skill.is_beta
             if skill.update():
                 self._invalidate_skills_cache()
-                self._skills_data = None
+                self._device_skill_state = None
                 if entry:
                     entry['updated'] = time.time()
 
         return self.apply(update_skill, self.local_skills.values())
 
-    @save_skills_data
+    @save_device_skill_state
     def update(self, skill=None, author=None):
         """Update all downloaded skills or one specified skill."""
         if skill is None:
@@ -406,17 +419,17 @@ class MycroftSkillsManager(object):
         else:
             if isinstance(skill, str):
                 skill = self.find_skill(skill, author)
-            entry = get_skill_entry(skill.name, self.skills_data)
-            if entry:
-                entry['beta'] = skill.is_beta
+            skill_state = get_skill_state(skill.name, self.device_skill_state)
+            if skill_state:
+                skill_state['beta'] = skill.is_beta
             if skill.update():
                 # On successful update update the update value
-                if entry:
-                    entry['updated'] = time.time()
+                if skill_state:
+                    skill_state['updated'] = time.time()
                     self._invalidate_skills_cache()
-                    self._skills_data = None
+                    self._device_skill_state = None
 
-    @save_skills_data
+    @save_device_skill_state
     def apply(self, func, skills, max_threads=20):
         """Run a function on all skills in parallel"""
 
@@ -437,7 +450,7 @@ class MycroftSkillsManager(object):
         with ThreadPool(max_threads) as tp:
             return tp.map(run_item, skills)
 
-    @save_skills_data
+    @save_device_skill_state
     def install_defaults(self):
         """Installs the default skills, updates all others"""
 

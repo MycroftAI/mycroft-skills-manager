@@ -6,7 +6,7 @@ import json
 from os.path import expanduser, isfile
 
 
-def load_skills_data() -> dict:
+def load_device_skill_state() -> dict:
     """Contains info on how skills should be updated"""
     skills_data_file = expanduser('~/.mycroft/skills.json')
     if isfile(skills_data_file):
@@ -19,21 +19,21 @@ def load_skills_data() -> dict:
         return {}
 
 
-def write_skills_data(data: dict):
+def write_device_skill_state(data: dict):
     skills_data_file = expanduser('~/.mycroft/skills.json')
     with open(skills_data_file, 'w') as f:
         json.dump(data, f, indent=4, separators=(',', ':'))
 
 
-def get_skill_entry(name, skills_data) -> dict:
+def get_skill_state(name, device_skill_state) -> dict:
     """ Find a skill entry in the skills_data and returns it. """
-    for e in skills_data.get('skills', []):
-        if e.get('name') == name:
-            return e
+    for skill_state in device_skill_state.get('skills', []):
+        if skill_state.get('name') == name:
+            return skill_state
     return {}
 
 
-def build_skill_entry(name, origin, beta, skill_gid) -> dict:
+def initialize_skill_state(name, origin, beta, skill_gid) -> dict:
     """ Create a new skill entry
     
     Arguments:
@@ -56,5 +56,5 @@ def build_skill_entry(name, origin, beta, skill_gid) -> dict:
     }
 
 
-def skills_data_hash(data):
+def device_skill_state_hash(data):
     return hash(json.dumps(data, sort_keys=True))
