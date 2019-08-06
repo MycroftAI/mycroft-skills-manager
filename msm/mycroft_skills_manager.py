@@ -122,9 +122,17 @@ class MycroftSkillsManager(object):
         The list method can be called directly if a fresh skill list is needed.
         """
         if self._all_skills is None:
-            self._all_skills = self.list()
+            self._all_skills = self._get_all_skills()
 
         return self._all_skills
+
+    def _get_all_skills(self):
+        LOG.info('building SkillEntry objects for all skills')
+        self._refresh_skill_repo()
+        remote_skills = self._get_remote_skills()
+        all_skills = self._merge_remote_with_local(remote_skills)
+
+        return all_skills
 
     def list(self):
         """Load a list of SkillEntry objects from both local and remote skills
@@ -138,10 +146,7 @@ class MycroftSkillsManager(object):
         Only call this method if you need a fresh version of the SkillEntry
         objects.
         """
-        LOG.info('building SkillEntry objects for all skills')
-        self._refresh_skill_repo()
-        remote_skills = self._get_remote_skills()
-        all_skills = self._merge_remote_with_local(remote_skills)
+        all_skills = self._get_all_skills()
         self._invalidate_skills_cache(new_value=all_skills)
 
         return all_skills
@@ -311,11 +316,15 @@ class MycroftSkillsManager(object):
 
     def _remove_skills_from_state(self):
         """Remove skills from state that no longer exist in the filesystem."""
+        skills_to_remove = []
         for skill in self._device_skill_state['skills']:
             is_not_local = skill['name'] not in self.local_skills
             is_installed_state = skill['installation'] == 'installed'
             if is_not_local and is_installed_state:
-                self._device_skill_state['skills'].remove(skill)
+                skills_to_remove.append(skill)
+
+        for skill in skills_to_remove:
+            self._device_skill_state['skills'].remove(skill)
 
     def _update_skill_gid(self):
         for skill in self._device_skill_state['skills']:
@@ -380,7 +389,6 @@ class MycroftSkillsManager(object):
             if skill_state:
                 self.device_skill_state['skills'].append(skill_state)
                 self._invalidate_skills_cache()
-                self._device_skill_state = None
 
     @save_device_skill_state
     def remove(self, param, author=None):
