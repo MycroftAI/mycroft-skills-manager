@@ -28,7 +28,7 @@ import logging
 from functools import wraps
 from glob import glob
 from multiprocessing.pool import ThreadPool
-from os.path import expanduser, join, dirname, isdir
+from os import path
 from typing import Dict, List
 
 from msm import GitException
@@ -95,7 +95,7 @@ class MycroftSkillsManager(object):
                  versioned=True):
         self.platform = platform
         self.skills_dir = (
-                expanduser(skills_dir or '') or self.DEFAULT_SKILLS_DIR
+                path.expanduser(skills_dir or '') or self.DEFAULT_SKILLS_DIR
         )
         self.repo = repo or SkillRepo()
         self.versioned = versioned
@@ -139,31 +139,40 @@ class MycroftSkillsManager(object):
         objects.
         """
         LOG.info('building SkillEntry objects for all skills')
+        self._refresh_skill_repo()
+        remote_skills = self._get_remote_skills()
+        all_skills = self._merge_remote_with_local(remote_skills)
+        self._invalidate_skills_cache(new_value=all_skills)
+
+        return all_skills
+
+    def _refresh_skill_repo(self):
         try:
             self.repo.update()
         except GitException as e:
-            if not isdir(self.repo.path):
+            if not path.isdir(self.repo.path):
                 raise
             LOG.warning('Failed to update repo: {}'.format(repr(e)))
+
+    def _get_remote_skills(self):
         remote_skill_list = (
             SkillEntry(
                 name, SkillEntry.create_path(self.skills_dir, url, name),
                 url, sha if self.versioned else '', msm=self
             )
-            for name, path, url, sha in self.repo.get_skill_data()
+            for name, skill_dir, url, sha in self.repo.get_skill_data()
         )
-        remote_skills = {
-            skill.id: skill for skill in remote_skill_list
-        }
+
+        return {skill.id: skill for skill in remote_skill_list}
+
+    def _merge_remote_with_local(self, remote_skills):
         all_skills = []
-        for skill_file in glob(join(self.skills_dir, '*', '__init__.py')):
-            skill = SkillEntry.from_folder(dirname(skill_file), msm=self)
+        for skill_file in glob(path.join(self.skills_dir, '*', '__init__.py')):
+            skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self)
             if skill.id in remote_skills:
                 skill.attach(remote_skills.pop(skill.id))
             all_skills.append(skill)
         all_skills += list(remote_skills.values())
-
-        self._invalidate_skills_cache(new_value=all_skills)
 
         return all_skills
 
@@ -463,8 +472,8 @@ class MycroftSkillsManager(object):
                 if skill.id == repo_id:
                     return skill
             name = SkillEntry.extract_repo_name(param)
-            path = SkillEntry.create_path(self.skills_dir, param)
-            return SkillEntry(name, path, param, msm=self)
+            skill_directory = SkillEntry.create_path(self.skills_dir, param)
+            return SkillEntry(name, skill_directory, param, msm=self)
         else:
             skill_confs = {
                 skill: skill.match(param, author)
