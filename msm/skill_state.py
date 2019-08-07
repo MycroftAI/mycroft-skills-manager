@@ -1,21 +1,20 @@
-"""
-    Functions related to manipulating the skills_data.json
-"""
+"""Functions related to manipulating the skills.json file."""
 import json
 from logging import getLogger
 from os.path import expanduser, isfile
 
 LOG = getLogger(__name__)
+SKILL_STATE_PATH = '~/.mycroft/skills.json'
 
 
 def load_device_skill_state() -> dict:
     """Contains info on how skills should be updated"""
-    skills_data_file = expanduser('~/.mycroft/skills.json')
+    skills_data_path = expanduser(SKILL_STATE_PATH)
     device_skill_state = {}
-    if isfile(skills_data_file):
+    if isfile(skills_data_path):
         try:
-            with open(skills_data_file) as f:
-                device_skill_state = json.load(f)
+            with open(skills_data_path) as skill_state_file:
+                device_skill_state = json.load(skill_state_file)
         except json.JSONDecodeError:
             LOG.exception('failed to load skills.json')
 
@@ -23,21 +22,24 @@ def load_device_skill_state() -> dict:
 
 
 def write_device_skill_state(data: dict):
-    skills_data_file = expanduser('~/.mycroft/skills.json')
-    with open(skills_data_file, 'w') as f:
-        json.dump(data, f, indent=4, separators=(',', ':'))
+    """Write the device skill state to disk."""
+    skill_state_path = expanduser(SKILL_STATE_PATH)
+    with open(skill_state_path, 'w') as skill_state_file:
+        json.dump(data, skill_state_file, indent=4, separators=(',', ':'))
 
 
 def get_skill_state(name, device_skill_state) -> dict:
-    """ Find a skill entry in the skills_data and returns it. """
+    """Find a skill entry in the device skill state and returns it."""
+    skill_state_return = {}
     for skill_state in device_skill_state.get('skills', []):
         if skill_state.get('name') == name:
-            return skill_state
-    return {}
+            skill_state_return = skill_state
+
+    return skill_state_return
 
 
 def initialize_skill_state(name, origin, beta, skill_gid) -> dict:
-    """ Create a new skill entry
+    """Create a new skill entry
     
     Arguments:
         name: skill name
@@ -47,16 +49,16 @@ def initialize_skill_state(name, origin, beta, skill_gid) -> dict:
     Returns:
         populated skills entry
     """
-    return {
-        'name': name,
-        'origin': origin,
-        'beta': beta,
-        'status': 'active',
-        'installed': 0,
-        'updated': 0,
-        'installation': 'installed',
-        'skill_gid': skill_gid
-    }
+    return dict(
+        name=name,
+        origin=origin,
+        beta=beta,
+        status='active',
+        installed=0,
+        updated=0,
+        installation='installed',
+        skill_gid=skill_gid
+    )
 
 
 def device_skill_state_hash(data):
