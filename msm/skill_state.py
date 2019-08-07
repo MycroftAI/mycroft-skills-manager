@@ -1,23 +1,24 @@
 """
     Functions related to manipulating the skills_data.json
 """
-
 import json
+from logging import getLogger
 from os.path import expanduser, isfile
 
+LOG = getLogger(__name__)
 
 def load_device_skill_state() -> dict:
     """Contains info on how skills should be updated"""
     skills_data_file = expanduser('~/.mycroft/skills.json')
+    device_skill_state = {}
     if isfile(skills_data_file):
         try:
             with open(skills_data_file) as f:
-                return json.load(f)
+                device_skill_state = json.load(f)
         except json.JSONDecodeError:
-            return {}
-    else:
-        return {}
+            LOG.exception('failed to load skills.json')
 
+    return device_skill_state
 
 def write_device_skill_state(data: dict):
     skills_data_file = expanduser('~/.mycroft/skills.json')
