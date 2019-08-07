@@ -7,6 +7,7 @@ from os.path import expanduser, isfile
 
 LOG = getLogger(__name__)
 
+
 def load_device_skill_state() -> dict:
     """Contains info on how skills should be updated"""
     skills_data_file = expanduser('~/.mycroft/skills.json')
@@ -19,6 +20,7 @@ def load_device_skill_state() -> dict:
             LOG.exception('failed to load skills.json')
 
     return device_skill_state
+
 
 def write_device_skill_state(data: dict):
     skills_data_file = expanduser('~/.mycroft/skills.json')
