@@ -238,8 +238,6 @@ class MycroftSkillsManager(object):
             self.device_skill_state_hash = device_skill_state_hash(
                 self.device_skill_state
             )
-        except Exception:
-            LOG.exception('init_skills_data failed')
         else:
             self.write_device_skill_state()
 
@@ -374,9 +372,8 @@ class MycroftSkillsManager(object):
             skill_state.update(
                 installation='failed',
                 status='error',
-                failure_message=repr(e)
+                failure_message=str(e)
             )
-            raise
         else:
             skill_state.update(
                 installed=time.time(),
@@ -386,7 +383,7 @@ class MycroftSkillsManager(object):
             )
         finally:
             # Store the entry in the list
-            if skill_state:
+            if skill_state is not None:
                 self.device_skill_state['skills'].append(skill_state)
                 self._invalidate_skills_cache()
 
