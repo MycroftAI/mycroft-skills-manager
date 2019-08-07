@@ -33,10 +33,12 @@ from typing import Dict, List
 
 from msm import GitException
 from msm.exceptions import (
+    AlreadyInstalled,
+    AlreadyRemoved,
     MsmException,
-    SkillNotFound,
     MultipleSkillMatches,
-    AlreadyInstalled
+    RemoveException,
+    SkillNotFound
 )
 from msm.skill_entry import SkillEntry
 from msm.skill_repo import SkillRepo
@@ -366,9 +368,12 @@ class MycroftSkillsManager(object):
         try:
             skill.install(constraints)
         except AlreadyInstalled:
+            log_msg = 'Skill {} already installed - ignoring install request'
+            LOG.info(log_msg.format(skill.name))
             skill_state = None
             raise
         except MsmException as e:
+            LOG.exception('Failed to install skill ' + skill.name)
             skill_state.update(
                 installation='failed',
                 status='error',
@@ -394,13 +399,20 @@ class MycroftSkillsManager(object):
             skill = param
         else:
             skill = self.find_skill(param, author)
-        skill.remove()
-        remaining_skills = []
-        for skill in self.device_skill_state['skills']:
-            if skill['name'] != skill.name:
-                remaining_skills.append(skill)
-        self.device_skill_state['skills'] = remaining_skills
-        self._invalidate_skills_cache()
+        try:
+            skill.remove()
+        except AlreadyRemoved:
+            LOG.info('Skill {} has already been removed'.format(skill.name))
+        except RemoveException:
+            LOG.exception('Failed to remove skill ' + skill.name)
+            raise
+        else:
+            remaining_skills = []
+            for skill_state in self.device_skill_state['skills']:
+                if skill_state['name'] != skill.name:
+                    remaining_skills.append(skill_state)
+            self.device_skill_state['skills'] = remaining_skills
+            self._invalidate_skills_cache()
 
     def update_all(self):
         def update_skill(skill):
