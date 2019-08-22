@@ -97,7 +97,7 @@ class cached_property(object):
         return self
 
     def __get__(self, inst, owner):
-        now = time.time()
+        now = time.monotonic()
         try:
             value, last_update = inst._cache[self.__name__]
             if self.ttl > 0 and now - last_update > self.ttl:
