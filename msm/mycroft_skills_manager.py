@@ -85,10 +85,6 @@ def save_device_skill_state(func):
 
 
 class MycroftSkillsManager(object):
-    _all_skills = None
-    _default_skills = None
-    _local_skills = None
-    _device_skill_state = None
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
     DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
@@ -102,6 +98,12 @@ class MycroftSkillsManager(object):
         self.repo = repo or SkillRepo()
         self.versioned = versioned
         self.lock = MsmProcessLock()
+
+        # Property placeholders
+        self._all_skills = None
+        self._default_skills = None
+        self._local_skills = None
+        self._device_skill_state = None
 
         self.saving_handled = False
         self.device_skill_state_hash = ''
