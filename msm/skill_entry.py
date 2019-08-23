@@ -197,6 +197,17 @@ class SkillEntry(object):
 
     @classmethod
     def from_folder(cls, path, msm=None):
+        """Find or create skill entry from folder path.
+
+        Arguments:
+            path:   path of skill folder
+            msm:    msm instance to use for caching and extended information
+                    retrieval.
+        """
+        if msm:
+            skills = {skill.path: skill for skill in msm.local_skills.values()}
+            if path in skills:
+                return skills[path]
         return cls(None, path, cls.find_git_url(path), msm=msm)
 
     @classmethod
