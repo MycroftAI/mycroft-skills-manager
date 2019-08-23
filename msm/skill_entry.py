@@ -44,7 +44,7 @@ from msm import SkillRequirementsException, git_to_msm_exceptions
 from msm.exceptions import PipRequirementsException, \
     SystemRequirementsException, AlreadyInstalled, SkillModified, \
     AlreadyRemoved, RemoveException, CloneException, NotInstalled, GitException
-from msm.util import Git
+from msm.util import cached_property, Git
 
 LOG = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ SWITCHABLE_BRANCHES = ['master']
 
 # default constraints to use if no are given
 DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
+FIVE_MINUTES = 300
 
 
 @contextmanager
@@ -141,10 +142,10 @@ class SkillEntry(object):
 
     @property
     def is_dirty(self):
-        """ True if different from the version in the mycroft-skills repo.
+        """True if different from the version in the mycroft-skills repo.
 
         Considers a skill dirty if
-        - the checkedout sha doesn't match the mycroft-skills repo
+        - the checkout sha doesn't match the mycroft-skills repo
         - the skill doesn't exist in the mycroft-skills repo
         - the skill is not a git repo
         - has local modifications
@@ -155,7 +156,7 @@ class SkillEntry(object):
             checkout = Git(self.path)
             mod = checkout.status(porcelain=True, untracked_files='no') != ''
             current_sha = checkout.rev_parse('HEAD')
-        except GitCommandError: # Not a git checkout
+        except GitCommandError:  # Not a git checkout
             return True
 
         skill_shas = {d[0]: d[3] for d in self.msm.repo.get_skill_data()}
@@ -163,9 +164,16 @@ class SkillEntry(object):
                 current_sha != skill_shas[self.name] or
                 mod)
 
-    @property
+    @cached_property(ttl=FIVE_MINUTES)
     def skill_gid(self):
-        """ Format skill gid for the skill. """
+        """Format skill gid for the skill.
+
+        This property does some Git gymnastics to determine its return value.
+        When a device boots, each skill accesses this property several times.
+        To reduce the amount of boot time, cache the value returned by this
+        property.  Cache expires five minutes after it is generated.
+        """
+        LOG.debug('Generating skill_gid for ' + self.name)
         gid = ''
         if self.is_dirty:
             gid += '@|'
@@ -512,6 +520,10 @@ class SkillEntry(object):
     def find_git_url(path):
         """Get the git url from a folder"""
         try:
+            LOG.debug(
+                'Attempting to retrieve the remote origin URL config for '
+                'skill in path ' + path
+            )
             return Git(path).config('remote.origin.url')
         except GitError:
             return ''

@@ -1,0 +1,26 @@
+{
+    "blacklist":[],
+    "skills":[
+        {
+            "installed":12345,
+            "origin":"default",
+            "status":"active",
+            "name":"skill-foo",
+            "installation":"installed",
+            "skill_gid":"skill-foo|99.99",
+            "beta":false,
+            "updated":0
+        },
+        {
+            "installed":23456,
+            "origin":"default",
+            "status":"active",
+            "name":"skill-bar",
+            "installation":"installed",
+            "skill_gid":"skill-bar|99.99",
+            "beta":false,
+            "updated":0
+        }
+    ],
+    "version":2
+}
