@@ -196,15 +196,16 @@ class SkillEntry(object):
         return self
 
     @classmethod
-    def from_folder(cls, path, msm=None):
+    def from_folder(cls, path, msm=None, use_cache=True):
         """Find or create skill entry from folder path.
 
         Arguments:
-            path:   path of skill folder
-            msm:    msm instance to use for caching and extended information
-                    retrieval.
+            path:       path of skill folder
+            msm:        msm instance to use for caching and extended information
+                        retrieval.
+            use_cache:  Enable/Disable cache usage. defaults to True
         """
-        if msm:
+        if msm and use_cache:
             skills = {skill.path: skill for skill in msm.local_skills.values()}
             if path in skills:
                 return skills[path]

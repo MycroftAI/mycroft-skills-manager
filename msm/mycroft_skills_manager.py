@@ -180,7 +180,8 @@ class MycroftSkillsManager(object):
         """Merge the skills found in the repo with those installed locally."""
         all_skills = []
         for skill_file in glob(path.join(self.skills_dir, '*', '__init__.py')):
-            skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self)
+            skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self,
+                                           use_cache=False)
             if skill.id in remote_skills:
                 skill.attach(remote_skills.pop(skill.id))
             all_skills.append(skill)
