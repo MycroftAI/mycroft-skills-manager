@@ -130,9 +130,9 @@ class SkillEntry(object):
             self.name = self.meta_info['name']
         else:
             self.name = basename(path)
-
-        self.author = self.extract_author(url) if url else ''
-        self.id = self.extract_repo_id(url) if url else self.name
+        from_github = (url.split("/")[-3] == 'github.com') if url else False
+        self.author = self.extract_author(url) if from_github else ''
+        self.id = self.extract_repo_id(url) if from_github else self.name
         self.is_local = exists(path)
         self.old_path = None  # Path of previous version while upgrading
 
@@ -227,7 +227,7 @@ class SkillEntry(object):
 
     @staticmethod
     def extract_author(url):
-        return url.rstrip('/').split("/")[-2].split(':')[-1]
+        return url.split("/")[-2].split(':')[-1]
 
     @classmethod
     def extract_repo_id(cls, url):
