@@ -219,7 +219,7 @@ class SkillEntry(object):
 
     @staticmethod
     def extract_repo_name(url):
-        s = url.rstrip('/').split("/")[-1]
+        s = url.split("/")[-1]
         a, b, c = s.rpartition('.git')
         if not c:
             return a
