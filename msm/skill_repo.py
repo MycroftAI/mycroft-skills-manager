@@ -73,7 +73,7 @@ class SkillRepo(object):
     def __init__(self, path=None, url=None, branch=None):
         self.path = path or "/opt/mycroft/.skills-repo"
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
-        self.branch = branch or "19.02"
+        self.branch = branch or "19.08"
         self.repo_info = {}
         try:
             skills_meta_cache = normpath(join(self.path,
