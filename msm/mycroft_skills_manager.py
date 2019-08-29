@@ -491,7 +491,7 @@ class MycroftSkillsManager(object):
         invalidates the cache.
         """
         LOG.info('invalidating skills cache')
-        if hasattr(self, '_cache'):
+        if hasattr(self, '_cache') and 'all_skills' in self._cache:
             del self._cache['all_skills']
         self._all_skills = None if new_value is None else new_value
         self._local_skills = None
