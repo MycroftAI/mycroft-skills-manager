@@ -110,6 +110,10 @@ class MycroftSkillsManager(object):
         with self.lock:
             self._init_skills_data()
 
+    def clear_device_skill_state(self):
+        """Clear device_skill_state so it is regenerated next use."""
+        self._device_skill_state = None
+
     @cached_property(ttl=ONE_DAY)
     def all_skills(self):
         """Getting a list of skills can take a while so cache it.
