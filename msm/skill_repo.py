@@ -29,13 +29,14 @@ from git.exc import GitCommandError, GitError
 
 from msm import git_to_msm_exceptions
 from msm.exceptions import MsmException
-from msm.util import Git
+from msm.util import cached_property, Git
 import logging
 import requests
 
 LOG = logging.getLogger(__name__)
 
 MYCROFT_SKILLS_DATA = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills-data"
+FIVE_MINUTES = 300
 
 def load_skills_data(branch, path):
     try:
@@ -75,14 +76,19 @@ class SkillRepo(object):
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
         self.branch = branch or "19.08"
         self.repo_info = {}
+
+    @cached_property(ttl=FIVE_MINUTES)
+    def skills_meta_info(self):
         try:
             skills_meta_cache = normpath(join(self.path,
                                               '..', '.skills-meta.json'))
-            self.skills_meta_info = load_skills_data(self.branch,
-                                                     skills_meta_cache)
+            skills_meta_info = load_skills_data(self.branch,
+                                                skills_meta_cache)
         except Exception as e:
             LOG.exception(repr(e))
-            self.skills_meta_info = {}
+            skills_meta_info = {}
+
+        return skills_meta_info
 
     def read_file(self, filename):
         with open(join(self.path, filename)) as f:
