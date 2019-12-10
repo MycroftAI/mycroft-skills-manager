@@ -26,13 +26,15 @@ setup(
     version='0.8.3',
     packages=['msm'],
     install_requires=[
-        'GitPython', 'typing', 'fasteners', 'pyyaml', 'pako',
+        'GitPython', 'fasteners', 'pyyaml', 'pako',
         'lazy'
     ],
+    python_requires='>=3.5',
     url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='Apache-2.0',
-    author='jarbasAI, Matthew Scholefield',
-    author_email='jarbasai@mailfence.com, matthew331199@gmail.com',
+    author='jarbasAI, Matthew Scholefield, Mycroft AI',
+    author_email='jarbasai@mailfence.com, matthew331199@gmail.com, '
+                 'dev@mycroft.ai',
     description='Mycroft Skills Manager',
     entry_points={
         'console_scripts': {
