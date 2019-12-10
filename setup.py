@@ -23,7 +23,7 @@ from setuptools import setup
 
 setup(
     name='msm',
-    version='0.8.3',
+    version='0.8.4',
     packages=['msm'],
     install_requires=[
         'GitPython', 'fasteners', 'pyyaml', 'pako',
