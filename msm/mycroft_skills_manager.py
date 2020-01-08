@@ -411,6 +411,7 @@ class MycroftSkillsManager(object):
             skill.remove()
         except AlreadyRemoved:
             LOG.info('Skill {} has already been removed'.format(skill.name))
+            raise
         except RemoveException:
             LOG.exception('Failed to remove skill ' + skill.name)
             raise

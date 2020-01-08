@@ -358,7 +358,8 @@ class TestMycroftSkillsManager(TestCase):
         )
         with patch('msm.mycroft_skills_manager.isinstance') as isinstance_mock:
             isinstance_mock.return_value = True
-            self.msm.remove(skill_to_remove)
+            with self.assertRaises(AlreadyRemoved):
+                self.msm.remove(skill_to_remove)
 
         self.assertListEqual([call.remove()], skill_to_remove.method_calls)
         self.assertIsNotNone(self.msm._local_skills)
