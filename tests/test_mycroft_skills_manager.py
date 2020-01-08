@@ -21,16 +21,16 @@
 # under the License.
 import json
 import os
+from os.path import dirname, join
 import tempfile
 from pathlib import Path
 from shutil import copyfile, rmtree
 from unittest import TestCase
+
 from unittest.mock import call, Mock, patch
 
-import pytest
-
 from msm import MycroftSkillsManager, AlreadyInstalled, AlreadyRemoved
-from msm.exceptions import SkillNotFound, MultipleSkillMatches, MsmException
+from msm.exceptions import MsmException
 from msm.skill_state import device_skill_state_hash
 
 
@@ -44,7 +44,8 @@ class TestMycroftSkillsManager(TestCase):
         self._mock_skills_json_path()
         self._mock_skill_entry()
         self._mock_skill_repo()
-        copyfile('skills_test.json', str(self.skills_json_path))
+        copyfile(join(dirname(__file__), 'skills_test.json'),
+                 str(self.skills_json_path))
         self.msm = MycroftSkillsManager(
             platform='default',
             skills_dir=str(self.temp_dir.joinpath('skills')),
@@ -162,8 +163,10 @@ class TestMycroftSkillsManager(TestCase):
         self.assertTrue(self.skills_json_path.exists())
         with open(self.skills_json_path) as skills_json:
             device_skill_state = json.load(skills_json)
-        self.assertListEqual(initial_state, state['skills'])
-        self.assertListEqual(initial_state, device_skill_state['skills'])
+        self.assertListEqual(sorted(initial_state, key=lambda x: x['name']),
+            sorted(device_skill_state['skills'], key=lambda x:x['name']))
+        self.assertListEqual(sorted(initial_state, key=lambda x: x['name']),
+            sorted(device_skill_state['skills'], key=lambda x: x['name']))
         self.assertListEqual([], state['blacklist'])
         self.assertListEqual([], device_skill_state['blacklist'])
         self.assertEqual(2, state['version'])
@@ -285,8 +288,9 @@ class TestMycroftSkillsManager(TestCase):
         skill_to_install.is_beta = False
         skill_to_install.install = Mock(side_effect=MsmException('RED ALERT!'))
         with patch('msm.mycroft_skills_manager.isinstance') as isinstance_mock:
-            isinstance_mock.return_value = True
-            self.msm.install(skill_to_install, origin='cli')
+            with self.assertRaises(MsmException):
+                isinstance_mock.return_value = True
+                self.msm.install(skill_to_install, origin='cli')
 
         with open(self.skills_json_path) as skills_json:
             device_skill_state = json.load(skills_json)
@@ -355,7 +359,8 @@ class TestMycroftSkillsManager(TestCase):
         )
         with patch('msm.mycroft_skills_manager.isinstance') as isinstance_mock:
             isinstance_mock.return_value = True
-            self.msm.remove(skill_to_remove)
+            with self.assertRaises(AlreadyRemoved):
+                self.msm.remove(skill_to_remove)
 
         self.assertListEqual([call.remove()], skill_to_remove.method_calls)
         self.assertIsNotNone(self.msm._local_skills)
