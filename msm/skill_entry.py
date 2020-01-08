@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Mycroft AI, Inc.
 #
 # This file is part of Mycroft Skills Manager
-# (see https://github.com/MatthewScholefield/mycroft-light).
+# (see https://github.com/MycroftAI/mycroft-skills-manager).
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -280,7 +280,7 @@ class SkillEntry(object):
 
     def run_pip(self, constraints=None):
         if not self.dependent_python_packages:
-            return
+            return False
 
         # Use constraints to limit the installed versions
         if constraints and not exists(constraints):
