@@ -288,8 +288,9 @@ class TestMycroftSkillsManager(TestCase):
         skill_to_install.is_beta = False
         skill_to_install.install = Mock(side_effect=MsmException('RED ALERT!'))
         with patch('msm.mycroft_skills_manager.isinstance') as isinstance_mock:
-            isinstance_mock.return_value = True
-            self.msm.install(skill_to_install, origin='cli')
+            with self.assertRaises(MsmException):
+                isinstance_mock.return_value = True
+                self.msm.install(skill_to_install, origin='cli')
 
         with open(self.skills_json_path) as skills_json:
             device_skill_state = json.load(skills_json)
