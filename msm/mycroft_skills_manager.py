@@ -71,10 +71,9 @@ def save_device_skill_state(func):
             will_save = self.saving_handled = True
         try:
             ret = func(self, *args, **kwargs)
-            # Write only if no exception occurs
+        finally:
             if will_save:
                 self.write_device_skill_state()
-        finally:
             # Always restore saving_handled flag
             if will_save:
                 self.saving_handled = False
@@ -381,12 +380,12 @@ class MycroftSkillsManager(object):
             skill_state = None
             raise
         except MsmException as e:
-            LOG.exception('Failed to install skill ' + skill.name)
             skill_state.update(
                 installation='failed',
                 status='error',
                 failure_message=str(e)
             )
+            raise
         else:
             skill_state.update(
                 installed=time.time(),
@@ -396,6 +395,7 @@ class MycroftSkillsManager(object):
             )
         finally:
             # Store the entry in the list
+            print('STORING STATE!')
             if skill_state is not None:
                 self.device_skill_state['skills'].append(skill_state)
                 self._invalidate_skills_cache()
