@@ -2,6 +2,9 @@
 *.egg-info/
 *.pyc
 dist/
+build/
 .pytest_cache/
 .coverage
 *venv/
+
+.*.sw? # vim swapfiles
