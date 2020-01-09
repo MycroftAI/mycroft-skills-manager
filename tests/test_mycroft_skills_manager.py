@@ -160,7 +160,7 @@ class TestMycroftSkillsManager(TestCase):
         ]
 
         self.assertTrue(self.skills_json_path.exists())
-        with open(self.skills_json_path) as skills_json:
+        with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
         self.assertListEqual(initial_state, state['skills'])
         self.assertListEqual(initial_state, device_skill_state['skills'])
@@ -227,7 +227,7 @@ class TestMycroftSkillsManager(TestCase):
                 time_mock.time.return_value = 100
                 self.msm.install(skill_to_install, origin='voice')
 
-        with open(self.skills_json_path) as skills_json:
+        with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
 
         skill_test_state = dict(
@@ -288,7 +288,7 @@ class TestMycroftSkillsManager(TestCase):
             isinstance_mock.return_value = True
             self.msm.install(skill_to_install, origin='cli')
 
-        with open(self.skills_json_path) as skills_json:
+        with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
 
         skill_test_state = dict(
@@ -324,7 +324,7 @@ class TestMycroftSkillsManager(TestCase):
             isinstance_mock.return_value = True
             self.msm.remove(skill_to_remove)
 
-        with open(self.skills_json_path) as skills_json:
+        with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
 
         skill_names = [skill['name'] for skill in device_skill_state['skills']]
@@ -409,7 +409,7 @@ class TestMycroftSkillsManager(TestCase):
             time_mock.time.return_value = 100
             self.msm.update(skill_to_update)
 
-        with open(self.skills_json_path) as skills_json:
+        with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
 
         skill_names = [skill['name'] for skill in device_skill_state['skills']]
