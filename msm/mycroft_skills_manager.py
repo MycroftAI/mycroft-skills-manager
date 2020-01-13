@@ -395,7 +395,6 @@ class MycroftSkillsManager(object):
             )
         finally:
             # Store the entry in the list
-            print('STORING STATE!')
             if skill_state is not None:
                 self.device_skill_state['skills'].append(skill_state)
                 self._invalidate_skills_cache()
