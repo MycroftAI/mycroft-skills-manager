@@ -23,12 +23,15 @@ def load_device_skill_state() -> dict:
 
 
 def write_device_skill_state(data: dict):
-    try:
-        os.system("mkdir ~/.mycroft")
-    except:
-        pass
     """Write the device skill state to disk."""
     skill_state_path = expanduser(SKILL_STATE_PATH)
+    dirPath = ""
+    pathList = skill_state_path.split("/")
+    pathList.pop()
+    for x in pathList:
+        dirPath += x + "/"
+    if not os.path.exists(dirPath):
+        os.makedirs(dirPath)
     with open(skill_state_path, 'w') as skill_state_file:
         json.dump(data, skill_state_file, indent=4, separators=(',', ':'))
 
