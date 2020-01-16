@@ -2,6 +2,7 @@
 import json
 from logging import getLogger
 from os.path import expanduser, isfile
+import os
 
 LOG = getLogger(__name__)
 SKILL_STATE_PATH = '~/.mycroft/skills.json'
@@ -22,6 +23,10 @@ def load_device_skill_state() -> dict:
 
 
 def write_device_skill_state(data: dict):
+    try:
+        os.system("mkdir ~/.mycroft")
+    except:
+        pass
     """Write the device skill state to disk."""
     skill_state_path = expanduser(SKILL_STATE_PATH)
     with open(skill_state_path, 'w') as skill_state_file:
