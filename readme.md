@@ -1,6 +1,6 @@
-## Py MSM
+## Mycroft Skills Manager
 
-Mycroft Skill Manager, in python!
+Mycroft Skills Manager is a command line tool and a python module for interacting with the mycroft-skills repository. It allows querying the repository for information (skill listings, skill meta data, etc) and of course installing and removing skills from the system.
 
 ## Install
 
