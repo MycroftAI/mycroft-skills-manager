@@ -130,7 +130,7 @@ class SkillEntry(object):
             self.name = self.meta_info['name']
         else:
             self.name = basename(path)
-        from_github = (url.split("/")[-3] == 'github.com') if url else False
+        from_github = (url.rstrip("/").split("/")[-3] == 'github.com') if url else False
         self.author = self.extract_author(url) if from_github else ''
         self.id = self.extract_repo_id(url) if from_github else self.name
         self.is_local = exists(path)
