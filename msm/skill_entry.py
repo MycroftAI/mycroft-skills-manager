@@ -227,7 +227,7 @@ class SkillEntry(object):
 
     @staticmethod
     def extract_author(url):
-        return url.split("/")[-2].split(':')[-1]
+        return url.rstrip('/').split("/")[-2].split(':')[-1]
 
     @classmethod
     def extract_repo_id(cls, url):
