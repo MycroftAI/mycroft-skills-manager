@@ -74,7 +74,7 @@ class SkillRepo(object):
     def __init__(self, path=None, url=None, branch=None):
         self.path = path or "/opt/mycroft/.skills-repo"
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
-        self.branch = branch or "19.08"
+        self.branch = branch or "20.02"
         self.repo_info = {}
 
     @cached_property(ttl=FIVE_MINUTES)
