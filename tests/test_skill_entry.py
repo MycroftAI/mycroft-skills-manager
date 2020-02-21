@@ -34,6 +34,17 @@ class TestSkillEntry(object):
             url='https://github.com/testuser/testrepo.git/'
         )
 
+
+    def test_https_init(self):
+        s = SkillEntry('test-name', 'test-path',
+                       url='https://github.com/testuser/testrepo.git/')
+        assert s.author == 'testuser'
+
+    def test_git_ssl_init(self):
+        s = SkillEntry('test-name', 'test-path',
+                       url='git@github.com:forslund/skill-cocktail.git')
+        assert s.author == ''
+
     def test_attach(self):
         """Attach a remote entry to a local entry"""
         remote = SkillEntry(
