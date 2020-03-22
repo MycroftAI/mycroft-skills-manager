@@ -305,7 +305,7 @@ class SkillEntry(object):
 
         with self.pip_lock:
             for dependent_python_package in self.dependent_python_packages:
-                pip_command = pip_args + dependent_python_package
+                pip_command = pip_args + [dependent_python_package]
                 proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
                 pip_code = proc.wait()
                 if pip_code != 0:
