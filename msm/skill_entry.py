@@ -304,6 +304,11 @@ class SkillEntry(object):
             pip_args = ['sudo', '-n'] + pip_args
 
         with self.pip_lock:
+            """
+            Iterate over the individual Python packages and
+            install them one by one to enforce the order specified
+            in the manifest.
+            """
             for dependent_python_package in self.dependent_python_packages:
                 pip_command = pip_args + [dependent_python_package]
                 proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
