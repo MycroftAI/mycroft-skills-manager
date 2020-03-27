@@ -297,7 +297,6 @@ class SkillEntry(object):
         LOG.info('Installing requirements.txt for ' + self.name)
         can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
         pip_args = [sys.executable, '-m', 'pip', 'install']
-        pip_args += self.dependent_python_packages
         if constraints:
             pip_args += ['-c', constraints]
 
@@ -305,18 +304,25 @@ class SkillEntry(object):
             pip_args = ['sudo', '-n'] + pip_args
 
         with self.pip_lock:
-            proc = Popen(pip_args, stdout=PIPE, stderr=PIPE)
-            pip_code = proc.wait()
-        if pip_code != 0:
-            stderr = proc.stderr.read().decode()
-            if pip_code == 1 and 'sudo:' in stderr and pip_args[0] == 'sudo':
-                raise PipRequirementsException(
-                    2, '', 'Permission denied while installing pip '
-                           'dependencies. Please run in virtualenv or use sudo'
-                )
-            raise PipRequirementsException(
-                pip_code, proc.stdout.read().decode(), stderr
-            )
+            """
+            Iterate over the individual Python packages and
+            install them one by one to enforce the order specified
+            in the manifest.
+            """
+            for dependent_python_package in self.dependent_python_packages:
+                pip_command = pip_args + [dependent_python_package]
+                proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
+                pip_code = proc.wait()
+                if pip_code != 0:
+                    stderr = proc.stderr.read().decode()
+                    if pip_code == 1 and 'sudo:' in stderr and pip_args[0] == 'sudo':
+                        raise PipRequirementsException(
+                            2, '', 'Permission denied while installing pip '
+                                   'dependencies. Please run in virtualenv or use sudo'
+                        )
+                    raise PipRequirementsException(
+                        pip_code, proc.stdout.read().decode(), stderr
+                    )
 
         return True
 
