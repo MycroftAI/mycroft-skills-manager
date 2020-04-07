@@ -28,7 +28,7 @@ def write_device_skill_state(data: dict):
     try:
         # create folder if it does not exist
         makedirs(dir_path)
-    except:
+    except Exception:
         pass
     skill_state_path = expanduser(SKILL_STATE_PATH)
     with open(skill_state_path, 'w') as skill_state_file:
