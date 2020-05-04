@@ -1,7 +1,8 @@
 """Functions related to manipulating the skills.json file."""
 import json
 from logging import getLogger
-from os.path import expanduser, isfile
+from os.path import expanduser, isfile, dirname
+from os import makedirs
 
 LOG = getLogger(__name__)
 SKILL_STATE_PATH = '~/.mycroft/skills.json'
@@ -23,6 +24,12 @@ def load_device_skill_state() -> dict:
 
 def write_device_skill_state(data: dict):
     """Write the device skill state to disk."""
+    dir_path = dirname(expanduser(SKILL_STATE_PATH))
+    try:
+        # create folder if it does not exist
+        makedirs(dir_path)
+    except Exception:
+        pass
     skill_state_path = expanduser(SKILL_STATE_PATH)
     with open(skill_state_path, 'w') as skill_state_file:
         json.dump(data, skill_state_file, indent=4, separators=(',', ':'))
