@@ -114,7 +114,7 @@ class SkillRepo(object):
     def update(self):
         try:
             self.__prepare_repo()
-        except GitError as e:
+        except (GitError, PermissionError) as e:
             LOG.warning('Could not prepare repo ({}), '
                         ' Creating temporary repo'.format(repr(e)))
             original_path = self.path
