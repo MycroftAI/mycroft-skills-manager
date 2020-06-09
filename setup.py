@@ -41,5 +41,4 @@ setup(
             'msm=msm.__main__:main'
         }
     },
-    data_files=[('msm', ['LICENSE'])]
 )
