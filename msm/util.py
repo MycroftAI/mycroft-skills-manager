@@ -20,11 +20,12 @@
 # specific language governing permissions and limitations
 # under the License.
 import time
-
 import git
 from os.path import exists
 from os import chmod
 from fasteners.process_lock import InterProcessLock
+from collections import defaultdict
+from xml.etree import cElementTree as ET
 
 
 class Git(git.cmd.Git):
@@ -49,13 +50,14 @@ class MsmProcessLock(InterProcessLock):
             chmod(lock_path, 0o777)
         super().__init__(lock_path)
 
+
 # The cached_property class defined below was copied from the
 # PythonDecoratorLibrary at:
 #   https://wiki.python.org/moin/PythonDecoratorLibrary/#Cached_Properties
 #
 # © 2011 Christopher Arndt, MIT License
 #
-class cached_property(object):
+class cached_property:
     """Decorator for read-only properties evaluated only once within TTL period.
 
     It can be used to create a cached property like this::
@@ -86,6 +88,7 @@ class cached_property(object):
         del instance._cache[<property name>]
 
     """
+
     def __init__(self, ttl=300):
         self.ttl = ttl
 
@@ -110,3 +113,61 @@ class cached_property(object):
                 cache = inst._cache = {}
             cache[self.__name__] = (value, now)
         return value
+
+
+#  xml2dict and dict2xml copied from jarbas_utils
+#    https://github.com/OpenJarbas/jarbas_utils/
+#
+#   Apache License, Version 2.0
+#
+
+def xml2dict(xml_string):
+
+    e = ET.XML(xml_string)
+
+    def etree2dict(t):
+        d = {t.tag: {} if t.attrib else None}
+        children = list(t)
+        if children:
+            dd = defaultdict(list)
+            for dc in map(etree2dict, children):
+                for k, v in dc.items():
+                    dd[k].append(v)
+            d = {t.tag: {k: v[0] if len(v) == 1 else v for k, v in
+                         dd.items()}}
+        if t.attrib:
+            d[t.tag].update((k, v) for k, v in t.attrib.items())
+        if t.text:
+            text = t.text.strip()
+            if children or t.attrib:
+                if text:
+                    d[t.tag]['text'] = text
+            else:
+                d[t.tag] = text
+        return d
+
+    return etree2dict(e)
+
+
+def dict2xml(d, root="xml"):
+    xml = "<" + root
+    for k in d:
+        if isinstance(d[k], str):
+            if k == "text":
+                pass
+            else:
+                xml += " " + k + ' ="' + d[k] + '"'
+    xml += ">"
+    for k in d:
+        if isinstance(d[k], dict):
+            xml += dict2xml(d[k], k)
+        if isinstance(d[k], list):
+            for e in d[k]:
+                if isinstance(e, dict):
+                    xml += dict2xml(e, k)
+        if isinstance(d[k], str):
+            if k == "text":
+                xml += d[k]
+
+    xml += "</" + root + ">"
+    return xml

@@ -2,3 +2,5 @@ requests
 GitPython
 fasteners
 lazy
+pyyaml
+pako

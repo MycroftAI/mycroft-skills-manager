@@ -20,7 +20,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import sys
-
+import json
 import logging
 import os
 import shutil
@@ -101,7 +101,7 @@ def _backup_previous_version(func: Callable = None):
     return wrapper
 
 
-class SkillEntry(object):
+class SkillEntry:
     pip_lock = Lock()
     manifest_yml_format = {
         'dependencies': {
@@ -112,18 +112,18 @@ class SkillEntry(object):
         }
     }
 
-    def __init__(self, name, path, url='', sha='', msm=None):
+    def __init__(self, name, path, url='', sha='', msm=None, meta_info=None):
         url = url.rstrip('/')
         url = url[:-len('.git')] if url.endswith('.git') else url
         self.path = path
         self.url = url
         self.sha = sha
         self.msm = msm
-        if msm:
+        if msm and meta_info is None:
             u = url.lower()
             self.meta_info = msm.repo.skills_meta_info.get(u, {})
         else:
-            self.meta_info = {}
+            self.meta_info = meta_info or {}
         if name is not None:
             self.name = name
         elif 'name' in self.meta_info:
@@ -215,6 +215,29 @@ class SkillEntry(object):
             if path in skills:
                 return skills[path]
         return cls(None, path, cls.find_git_url(path), msm=msm)
+
+    @classmethod
+    def from_json(cls, json_data, msm, use_cache=True):
+        """Find or create skill entry from folder path.
+
+        Arguments:
+            json_data:  skill.json  str or dict
+            msm:        msm instance to use for caching and extended information
+                        retrieval.
+            use_cache:  Enable/Disable cache usage. defaults to True
+        """
+        if isinstance(json_data, str):
+            json_data = json.loads(json_data)
+
+        name = json_data["skillname"]
+        url = json_data["url"]
+        path = cls.create_path(msm.skills_dir, url, name)
+
+        if use_cache:
+            skills = {skill.path: skill for skill in msm.local_skills.values()}
+            if path in skills:
+                return skills[path]
+        return cls(name, path, url, msm=msm, meta_info=json_data)
 
     @classmethod
     def create_path(cls, folder, url, name=''):

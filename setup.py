@@ -24,7 +24,7 @@ from setuptools import setup
 setup(
     name='msm',
     version='0.8.7',
-    packages=['msm'],
+    packages=['msm', 'msm.appstores'],
     install_requires=[
         'GitPython', 'fasteners', 'pyyaml', 'pako',
         'lazy'
