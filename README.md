@@ -44,4 +44,4 @@ msm -b master -p kde default
 
 ## Credits
 
-[JarbasAI](https://github.com/JarbasAl/ZZZ-py_msm) and Mycroft AI
+[JarbasAI/py_msm](https://github.com/JarbasAl/ZZZ-py_msm) and Mycroft AI
