@@ -23,6 +23,7 @@ from glob import glob
 from os import makedirs
 from os.path import exists, join, isdir, dirname, basename, normpath
 import json
+from tempfile import gettempdir
 
 from git import Repo
 from git.exc import GitCommandError, GitError
@@ -118,7 +119,7 @@ class SkillRepo(object):
             LOG.warning('Could not prepare repo ({}), '
                         ' Creating temporary repo'.format(repr(e)))
             original_path = self.path
-            self.path = '/tmp/.skills-repo'
+            self.path = join(gettempdir(), '.skills-repo')
             try:
                 with git_to_msm_exceptions():
                     self.__prepare_repo()
