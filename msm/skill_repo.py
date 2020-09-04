@@ -36,39 +36,78 @@ import requests
 
 LOG = logging.getLogger(__name__)
 
-MYCROFT_SKILLS_DATA = "https://raw.githubusercontent.com/MycroftAI/mycroft-skills-data"
+MYCROFT_SKILLS_DATA = ("https://raw.githubusercontent.com/"
+                       "MycroftAI/mycroft-skills-data")
 FIVE_MINUTES = 300
 
-def load_skills_data(branch, path):
+
+def download_skills_data(branch, path):
+    """Download and if possible save skills meta-data as local cache.
+
+    Arguments:
+        branch: skills-repo branch to fetch data for
+        path: path to skills meta-data cache.
+
+    Returns:
+        (dict) skills meta-data as dict.
+    """
+    market_info_url = (MYCROFT_SKILLS_DATA + "/" + branch +
+                       "/skill-metadata.json")
     try:
-        market_info_url = (MYCROFT_SKILLS_DATA + "/" + branch +
-                           "/skill-metadata.json")
         info = requests.get(market_info_url).json()
+    except (requests.HTTPError, requests.exceptions.ConnectionError) as e:
+        LOG.warning("Skill metadata couldn't be fetched "
+                    "({})".format(repr(e)))
+        info = {}
+    if info:
         # Cache the received data
-        with open(path, 'w') as f:
-            try:
+        try:
+            with open(path, 'w') as f:
                 json.dump(info, f)
-            except Exception as e:
-                LOG.warning('Couldn\'t save cached version of '
-                            'skills-metadata.json')
-        return {info[k]['repo'].lower(): info[k] for k in info}
-    except (requests.HTTPError, requests.exceptions.ConnectionError):
-        pass
-    except Exception as e:
-        LOG.warning("Skill metadata couldn't be fetched ({})".format(repr(e)))
+        except Exception as e:
+            LOG.warning('Couldn\'t save cached version of '
+                        'skills-metadata.json ({})'.format(e))
+    return info
+
+
+def load_cached_skills_data(path):
+    """Load cached skills_data from file.
+
+    Arguments:
+        path:   path of meta-data cache.
+
+    Returns:
+        (dict) skills meta-data as dict.
+    """
+    try:
+        with open(path) as f:
+            info = json.load(f)
+    except Exception:
+        LOG.warning('skills-metadata cache exists but can\'t '
+                    'be parsed')
+        info = {}
+    return info
+
+
+def load_skills_data(branch, path):
+    """Load skills data, either from web or local cache.
+
+    Arguments:
+        branch: skills-repo branch to fetch data for
+        path: path to skills meta-data cache.
+
+    Returns:
+        dict where key is a skill github repo and value is the meta-data entry
+        for the skill.
+    """
+    info = download_skills_data(branch, path)
 
     # Try to load cache if fetching failed
-    if exists(path):
-        with open(path) as f:
-            try:
-                info = json.load(f)
-            except Exception:
-                LOG.warning('skills-metadata cache exists but can\'t '
-                            'be parsed')
-                return {}
-        return {info[k]['repo'].lower(): info[k] for k in info}
-    else:
-        return {}
+    if not info and exists(path):
+        info = load_cached_skills_data(path)
+
+    # Return data indexed by repo
+    return {info[k]['repo'].lower(): info[k] for k in info}
 
 
 class SkillRepo(object):
