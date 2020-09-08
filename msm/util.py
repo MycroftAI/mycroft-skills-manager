@@ -22,8 +22,10 @@
 import time
 
 import git
-from os.path import exists
+from os.path import exists, join
 from os import chmod
+from tempfile import gettempdir
+
 from fasteners.process_lock import InterProcessLock
 
 
@@ -42,7 +44,7 @@ class Git(git.cmd.Git):
 
 class MsmProcessLock(InterProcessLock):
     def __init__(self):
-        lock_path = '/tmp/msm_lock'
+        lock_path = join(gettempdir(), 'msm_lock')
         if not exists(lock_path):
             lock_file = open(lock_path, '+w')
             lock_file.close()
