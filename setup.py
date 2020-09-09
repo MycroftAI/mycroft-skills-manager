@@ -21,6 +21,9 @@
 # under the License.
 from setuptools import setup
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
     name='msm',
     version='0.8.8',
@@ -36,6 +39,16 @@ setup(
     author_email='jarbasai@mailfence.com, matthew331199@gmail.com, '
                  'dev@mycroft.ai',
     description='Mycroft Skills Manager',
+    long_description=long_description,
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+    ],
     entry_points={
         'console_scripts': {
             'msm=msm.__main__:main'
