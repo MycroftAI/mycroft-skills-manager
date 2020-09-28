@@ -327,6 +327,7 @@ class SkillEntry(object):
         return True
 
     def install_system_deps(self):
+        success = True
         self.run_requirements_sh()
         system_packages = {
             exe: (packages or '').split()
@@ -334,26 +335,29 @@ class SkillEntry(object):
         }
         LOG.info('Installing system requirements...')
         all_deps = system_packages.pop('all', [])
-        try:
-            manager = PakoManager()
-            success = manager.install(all_deps, overrides=system_packages)
-        except RuntimeError as e:
-            LOG.warning('Failed to launch package manager: {}'.format(e))
-            success = False
-        missing_exes = [
-            exe for exe in self.dependencies.get('exes') or []
-            if not shutil.which(exe)
-        ]
-        if missing_exes:
-            if not success:
-                LOG.warning('Failed to install dependencies.')
-                if all_deps:
-                    LOG.warning('Please install manually: {}'.format(
-                        ' '.join(all_deps)
-                    ))
-            raise SkillRequirementsException('Could not find exes: {}'.format(
-                ', '.join(missing_exes)
-            ))
+        use_pako = bool(all_deps)
+        if use_pako:  # Only try to install if there are packages to install
+            try:
+                manager = PakoManager()
+                success = manager.install(all_deps, overrides=system_packages)
+            except RuntimeError as e:
+                LOG.warning('Failed to launch package manager: {}'.format(e))
+                success = False
+            missing_exes = [
+                exe for exe in self.dependencies.get('exes') or []
+                if not shutil.which(exe)
+            ]
+            if missing_exes:
+                if use_pako:
+                    # Pako was used and apparently failed.
+                    LOG.warning('Failed to install dependencies.')
+                    if all_deps:
+                        LOG.warning('Please install manually: {}'.format(
+                            ' '.join(all_deps)
+                        ))
+                raise SkillRequirementsException(
+                    'Could not find exes: {}'.format(', '.join(missing_exes))
+                )
         return success
 
     def run_requirements_sh(self):
