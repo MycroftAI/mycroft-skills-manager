@@ -57,6 +57,23 @@ DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
 FIVE_MINUTES = 300
 
 
+def _perform_pako_install(packages):
+    """Install the list of packagess using Pako.
+
+    Arguments:
+        packages (list): list of packages to install.
+    Returns:
+        (bool) True if install completed successfully, else False
+    """
+    try:
+        manager = PakoManager()
+        success = manager.install(packages, overrides=system_packages)
+    except RuntimeError as e:
+        LOG.warning('Failed to launch package manager: {}'.format(e))
+        success = False
+    return success
+
+
 @contextmanager
 def work_dir(directory):
     old_dir = os.getcwd()
@@ -327,37 +344,33 @@ class SkillEntry(object):
         return True
 
     def install_system_deps(self):
-        success = True
         self.run_requirements_sh()
         system_packages = {
             exe: (packages or '').split()
             for exe, packages in self.dependent_system_packages.items()
         }
         LOG.info('Installing system requirements...')
-        all_deps = system_packages.pop('all', [])
-        use_pako = bool(all_deps)
-        if use_pako:  # Only try to install if there are packages to install
-            try:
-                manager = PakoManager()
-                success = manager.install(all_deps, overrides=system_packages)
-            except RuntimeError as e:
-                LOG.warning('Failed to launch package manager: {}'.format(e))
-                success = False
-            missing_exes = [
-                exe for exe in self.dependencies.get('exes') or []
-                if not shutil.which(exe)
-            ]
-            if missing_exes:
-                if use_pako:
-                    # Pako was used and apparently failed.
-                    LOG.warning('Failed to install dependencies.')
-                    if all_deps:
-                        LOG.warning('Please install manually: {}'.format(
-                            ' '.join(all_deps)
-                        ))
-                raise SkillRequirementsException(
-                    'Could not find exes: {}'.format(', '.join(missing_exes))
-                )
+        packages = system_packages.pop('all', [])
+        if packages:  # Only try to install if there are packages to install
+            success = _perform_pako_install(packages)
+        else:
+            success = True  # No packages to install
+
+        missing_exes = [
+            exe for exe in self.dependencies.get('exes') or []
+            if not shutil.which(exe)
+        ]
+        # If executables are missing on the system inform of the issue.
+        if missing_exes:
+            # Pako was used and apparently failed.
+            LOG.warning('Failed to install dependencies.')
+            if packages:
+                LOG.warning('Please install manually: {}'.format(
+                    ' '.join(all_deps)
+                ))
+            raise SkillRequirementsException(
+                'Could not find exes: {}'.format(', '.join(missing_exes))
+            )
         return success
 
     def run_requirements_sh(self):
