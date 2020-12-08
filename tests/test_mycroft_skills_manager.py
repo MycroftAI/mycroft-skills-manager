@@ -67,9 +67,9 @@ class TestMycroftSkillsManager(TestCase):
         self.log_mock = log_patch.start()
 
     def _mock_skills_json_path(self):
-        expanduser_patch = patch('msm.skill_state.expanduser')
-        self.addCleanup(expanduser_patch.stop)
-        self.skills_json_path_mock = expanduser_patch.start()
+        savedatapath_patch = patch('msm.skill_state.BaseDirectory.save_data_path')
+        self.addCleanup(savedatapath_patch.stop)
+        self.skills_json_path_mock = savedatapath_patch.start()
         self.skills_json_path_mock.return_value = str(
             self.temp_dir.joinpath('skills.json')
         )
