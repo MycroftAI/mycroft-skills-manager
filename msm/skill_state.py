@@ -8,17 +8,26 @@ from os import makedirs
 from xdg import BaseDirectory
 
 LOG = getLogger(__name__)
-SKILL_STATE_PATH = join(BaseDirectory.save_data_path('mycroft'), 'skills.json')
+
+
+def get_state_path():
+    """Get complete path for skill state file.
+
+    Returns:
+        (str) path to skills.json
+    """
+    return join(BaseDirectory.save_data_path('mycroft'), 'skills.json')
+
 
 # Make sure we migrate the installed skills file from the old non-XDG location
 old_skill_state_path = expanduser('~/.mycroft/skills.json')
 if isfile(old_skill_state_path):
-    shutil.move(old_skill_state_path, SKILL_STATE_PATH)
+    shutil.move(old_skill_state_path, get_state_path())
 
 
 def load_device_skill_state() -> dict:
     """Contains info on how skills should be updated"""
-    skills_data_path = SKILL_STATE_PATH
+    skills_data_path = get_state_path()
     device_skill_state = {}
     if isfile(skills_data_path):
         try:
@@ -32,13 +41,13 @@ def load_device_skill_state() -> dict:
 
 def write_device_skill_state(data: dict):
     """Write the device skill state to disk."""
-    dir_path = dirname(SKILL_STATE_PATH)
+    dir_path = dirname(get_state_path())
     try:
         # create folder if it does not exist
         makedirs(dir_path)
     except Exception:
         pass
-    skill_state_path = SKILL_STATE_PATH
+    skill_state_path = get_state_path()
     with open(skill_state_path, 'w') as skill_state_file:
         json.dump(data, skill_state_file, indent=4, separators=(',', ':'))
 
