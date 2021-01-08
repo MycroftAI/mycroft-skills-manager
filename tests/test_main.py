@@ -33,14 +33,11 @@ class TestMain(object):
         self.base_params = [
             '-u', 'https://github.com/mycroftai/mycroft-skills-manager',
             '-b', 'test-repo',
-            '-c', join(root, 'repo-instance'),
             '-d', join(root, 'test-skills')
         ]
 
     def teardown(self):
-        for i in ['repo-instance', 'test-skills']:
-            if join(self.root, i):
-                rmtree(join(self.root, i))
+        rmtree(join(self.root, 'test-skills'))
 
     def __call__(self, *args):
         params = self.base_params + ' '.join(map(str, args)).split(' ')

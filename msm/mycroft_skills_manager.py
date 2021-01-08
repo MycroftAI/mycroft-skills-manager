@@ -25,11 +25,14 @@ MSM can be used on the command line but is also used by Mycroft core daemons.
 """
 import time
 import logging
+import shutil
 from functools import wraps
 from glob import glob
 from multiprocessing.pool import ThreadPool
 from os import path
 from typing import Dict, List
+
+from xdg import BaseDirectory
 
 from msm import GitException
 from msm.exceptions import (
@@ -86,14 +89,17 @@ def save_device_skill_state(func):
 class MycroftSkillsManager(object):
     SKILL_GROUPS = {'default', 'mycroft_mark_1', 'picroft', 'kde',
                     'respeaker', 'mycroft_mark_2', 'mycroft_mark_2pi'}
-    DEFAULT_SKILLS_DIR = "/opt/mycroft/skills"
 
-    def __init__(self, platform='default', skills_dir=None, repo=None,
-                 versioned=True):
+    def __init__(self, platform='default', old_skills_dir=None,
+                 skills_dir=None, repo=None, versioned=True):
         self.platform = platform
-        self.skills_dir = (
-                path.expanduser(skills_dir or '') or self.DEFAULT_SKILLS_DIR
-        )
+
+        # Keep this variable alive for a while, is used to move skills from the
+        # old config based location to XDG
+        self.old_skills_dir = path.expanduser(old_skills_dir or '') or None
+        self.skills_dir = (skills_dir or 
+                           BaseDirectory.save_data_path('mycroft/skills'))
+
         self.repo = repo or SkillRepo()
         self.versioned = versioned
         self.lock = MsmProcessLock()
@@ -183,6 +189,16 @@ class MycroftSkillsManager(object):
     def _merge_remote_with_local(self, remote_skills):
         """Merge the skills found in the repo with those installed locally."""
         all_skills = []
+
+        # First move locally installed skills from old to new location
+        # TODO: get rid of this at some point
+        if self.old_skills_dir:
+            for old_skill_dir in glob(path.join(self.old_skills_dir, '*/')):
+                skill_name = old_skill_dir.rstrip('/').rsplit('/', 1)[1]
+                new_skill_path = self.skills_dir + "/" + skill_name
+                if not path.isdir(new_skill_path):
+                    shutil.move(old_skill_dir, self.skills_dir + "/" + skill_name)
+
         for skill_file in glob(path.join(self.skills_dir, '*', '__init__.py')):
             skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self,
                                            use_cache=False)

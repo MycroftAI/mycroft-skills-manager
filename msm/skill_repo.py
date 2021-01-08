@@ -25,6 +25,7 @@ from os.path import exists, join, isdir, dirname, basename, normpath
 import json
 from tempfile import gettempdir
 
+from xdg import BaseDirectory
 from git import Repo
 from git.exc import GitCommandError, GitError
 
@@ -111,8 +112,9 @@ def load_skills_data(branch, path):
 
 
 class SkillRepo(object):
-    def __init__(self, path=None, url=None, branch=None):
-        self.path = path or "/opt/mycroft/.skills-repo"
+    def __init__(self, url=None, branch=None):
+        self.path = join(BaseDirectory.save_data_path('mycroft'),
+                         'skills-repo')
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
         self.branch = branch or "20.08"
         self.repo_info = {}
@@ -121,7 +123,7 @@ class SkillRepo(object):
     def skills_meta_info(self):
         try:
             skills_meta_cache = normpath(join(self.path,
-                                              '..', '.skills-meta.json'))
+                                              '..', 'skills-meta.json'))
             skills_meta_info = load_skills_data(self.branch,
                                                 skills_meta_cache)
         except Exception as e:

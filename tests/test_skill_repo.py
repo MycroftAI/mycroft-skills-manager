@@ -31,7 +31,6 @@ class TestSkillRepo(object):
         root = dirname(abspath(__file__))
         chdir(root)
         self.repo = SkillRepo(
-            join(root, 'repo-instance'),
             'https://github.com/mycroftai/mycroft-skills-manager', 'test-repo'
         )
         self.repo.update()
@@ -77,6 +76,3 @@ class TestSkillRepo(object):
             'default': ['skill-a'],
             'platform-1': ['skill-b']
         }
-
-    def teardown(self):
-        rmtree('repo-instance')

@@ -28,6 +28,7 @@ setup(
     name='msm',
     version='0.8.8',
     packages=['msm'],
+    tests_require=['pytest', 'pytest-env'],
     install_requires=[
         'GitPython', 'fasteners', 'pyyaml', 'pako',
         'lazy', 'pyxdg'
