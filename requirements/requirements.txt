@@ -1,5 +1,7 @@
-requests
 GitPython
 fasteners
 lazy
+pako
 pyxdg
+pyyaml
+requests

@@ -19,20 +19,30 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
+
 from setuptools import setup
+
+BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+
+def required(requirements_file):
+    """ Read requirements file and remove comments and empty lines. """
+    with open(os.path.join(BASEDIR, requirements_file), 'r') as file_handler:
+        requirements = file_handler.read().splitlines()
+        return [pkg for pkg in requirements
+                if pkg.strip() and not pkg.startswith("#")]
+
 
 setup(
     name='msm',
     version='0.8.8',
     packages=['msm'],
-    tests_require=['pytest', 'pytest-env'],
-    install_requires=[
-        'GitPython', 'fasteners', 'pyyaml', 'pako',
-        'lazy', 'pyxdg'
-    ],
+    install_requires=required('requirements/requirements.txt'),
+    tests_require=required('requirements/tests.txt'),
     python_requires='>=3.5',
     url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='Apache-2.0',
