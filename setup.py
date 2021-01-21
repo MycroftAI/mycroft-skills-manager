@@ -30,7 +30,7 @@ setup(
     packages=['msm'],
     install_requires=[
         'GitPython', 'fasteners', 'pyyaml', 'pako',
-        'lazy'
+        'lazy', 'pyxdg'
     ],
     python_requires='>=3.5',
     url='https://github.com/MycroftAI/mycroft-skills-manager',

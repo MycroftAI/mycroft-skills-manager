@@ -2,3 +2,4 @@ requests
 GitPython
 fasteners
 lazy
+pyxdg
