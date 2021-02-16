@@ -1,10 +1,10 @@
 """Functions related to manipulating the skills.json file."""
 import json
-import os
 import shutil
 from logging import getLogger
-from os.path import isfile, dirname, join, expanduser
 from os import makedirs
+from os.path import isfile, dirname, join, expanduser
+
 from xdg import BaseDirectory
 
 LOG = getLogger(__name__)

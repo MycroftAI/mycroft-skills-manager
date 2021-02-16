@@ -20,8 +20,7 @@
 # specific language governing permissions and limitations
 # under the License.
 from os import chdir
-from os.path import abspath, dirname, join
-from shutil import rmtree
+from os.path import abspath, dirname
 
 from msm import SkillRepo
 

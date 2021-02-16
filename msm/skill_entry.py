@@ -19,7 +19,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import sys
 
 import logging
 import os
@@ -32,7 +31,7 @@ from functools import wraps
 from git import Repo, GitError
 from git.exc import GitCommandError
 from lazy import lazy
-from os.path import exists, join, basename, dirname, isfile
+from os.path import exists, join, basename, isfile
 from shutil import rmtree, move
 from subprocess import PIPE, Popen
 from tempfile import mktemp, gettempdir
@@ -297,8 +296,8 @@ class SkillEntry(object):
         else:
             author_weight = 1.0
         return author_weight * (
-                sum(weight * val for weight, val in weights) /
-                sum(weight for weight, val in weights)
+            sum(weight * val for weight, val in weights) /
+            sum(weight for weight, val in weights)
         )
 
     def run_pip(self, constraints=None):
@@ -454,8 +453,8 @@ class SkillEntry(object):
                 req_lines += f.readlines()
         req_lines += self.dependencies.get('python') or []
         # Strip comments
-        req_lines = [l.split('#')[0].strip() for l in req_lines]
-        return [i for i in req_lines if i]  # Strip empty lines
+        req_lines = [line.split('#')[0].strip() for line in req_lines]
+        return [line for line in req_lines if line]  # Strip empty lines
 
     @lazy
     def dependent_system_packages(self):

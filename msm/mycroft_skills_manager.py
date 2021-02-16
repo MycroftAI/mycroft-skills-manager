@@ -97,7 +97,7 @@ class MycroftSkillsManager(object):
         # Keep this variable alive for a while, is used to move skills from the
         # old config based location to XDG
         self.old_skills_dir = path.expanduser(old_skills_dir or '') or None
-        self.skills_dir = (skills_dir or 
+        self.skills_dir = (skills_dir or
                            BaseDirectory.save_data_path('mycroft/skills'))
 
         self.repo = repo or SkillRepo()
@@ -197,7 +197,8 @@ class MycroftSkillsManager(object):
                 skill_name = old_skill_dir.rstrip('/').rsplit('/', 1)[1]
                 new_skill_path = self.skills_dir + "/" + skill_name
                 if not path.isdir(new_skill_path):
-                    shutil.move(old_skill_dir, self.skills_dir + "/" + skill_name)
+                    shutil.move(old_skill_dir, self.skills_dir +
+                                "/" + skill_name)
 
         for skill_file in glob(path.join(self.skills_dir, '*', '__init__.py')):
             skill = SkillEntry.from_folder(path.dirname(skill_file), msm=self,
@@ -481,7 +482,7 @@ class MycroftSkillsManager(object):
                     func.__name__, skill.name, repr(e)
                 ))
                 return False
-            except:
+            except Exception:
                 LOG.exception('Error running {} on {}:'.format(
                     func.__name__, skill.name
                 ))
