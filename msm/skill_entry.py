@@ -57,11 +57,12 @@ DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
 FIVE_MINUTES = 300
 
 
-def _perform_pako_install(packages):
+def _perform_pako_install(packages, system_packages=None):
     """Install the list of packagess using Pako.
 
     Arguments:
         packages (list): list of packages to install.
+        system_packages (dict): system specific package overrides.
     Returns:
         (bool) True if install completed successfully, else False
     """
@@ -349,7 +350,7 @@ class SkillEntry(object):
         LOG.info('Installing system requirements...')
         packages = system_packages.pop('all', [])
         if packages:  # Only try to install if there are packages to install
-            success = _perform_pako_install(packages)
+            success = _perform_pako_install(packages, system_packages)
         else:
             success = True  # No packages to install
 
@@ -363,7 +364,7 @@ class SkillEntry(object):
             LOG.warning('Failed to install dependencies.')
             if packages:
                 LOG.warning('Please install manually: {}'.format(
-                    ' '.join(all_deps)
+                    ' '.join(packages)
                 ))
             raise SkillRequirementsException(
                 'Could not find exes: {}'.format(', '.join(missing_exes))
