@@ -1,10 +1,12 @@
 .idea/
 *.egg-info/
 *.pyc
-dist/
-build/
+.cache/
 .pytest_cache/
 .coverage
 *venv/
-
+.vscode/
 .*.sw? # vim swapfiles
+
+dist/
+build/
