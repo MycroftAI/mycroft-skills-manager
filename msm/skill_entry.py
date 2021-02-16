@@ -312,13 +312,10 @@ class SkillEntry(object):
             constraints = DEFAULT_CONSTRAINTS
 
         LOG.info('Installing requirements.txt for ' + self.name)
-        can_pip = os.access(dirname(sys.executable), os.W_OK | os.X_OK)
-        pip_args = [sys.executable, '-m', 'pip', 'install']
+        pip_args = ['pip', 'install']
+
         if constraints:
             pip_args += ['-c', constraints]
-
-        if not can_pip:
-            pip_args = ['sudo', '-n'] + pip_args
 
         with self.pip_lock:
             """

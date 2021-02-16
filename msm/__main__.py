@@ -55,7 +55,6 @@ def main(args=None, printer=print):
     parser.add_argument('-u', '--repo-url')
     parser.add_argument('-b', '--repo-branch')
     parser.add_argument('-d', '--skills-dir')
-    parser.add_argument('-c', '--repo-cache')
     parser.add_argument('-l', '--latest', action='store_false',
                         dest='versioned', help="Disable skill versioning")
     parser.add_argument('-r', '--raw', action='store_true')
@@ -91,10 +90,10 @@ def main(args=None, printer=print):
         LOG.level = ERROR
 
     repo = SkillRepo(
-        url=args.repo_url, branch=args.repo_branch, path=args.repo_cache
+        url=args.repo_url, branch=args.repo_branch
     )
     msm = MycroftSkillsManager(
-        args.platform, args.skills_dir, repo, args.versioned
+        platform=args.platform, repo=repo, skills_dir=args.skills_dir, versioned=args.versioned
     )
     main_functions = {
         'install': lambda: msm.install(args.skill, args.author,

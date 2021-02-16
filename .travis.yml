@@ -10,7 +10,6 @@ python:
   - "3.9"
 # command to install dependencies
 install:
-  - pip install -r requirements.txt
   - pip install .
   - mkdir $HOME/.mycroft
 # command to run tests
