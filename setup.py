@@ -51,6 +51,7 @@ setup(
                  'dev@mycroft.ai',
     description='Mycroft Skills Manager',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
