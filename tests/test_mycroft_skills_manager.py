@@ -165,9 +165,9 @@ class TestMycroftSkillsManager(TestCase):
         with open(str(self.skills_json_path)) as skills_json:
             device_skill_state = json.load(skills_json)
         self.assertListEqual(sorted(initial_state, key=lambda x: x['name']),
-            sorted(device_skill_state['skills'], key=lambda x:x['name']))
+                             sorted(device_skill_state['skills'], key=lambda x: x['name']))
         self.assertListEqual(sorted(initial_state, key=lambda x: x['name']),
-            sorted(device_skill_state['skills'], key=lambda x: x['name']))
+                             sorted(device_skill_state['skills'], key=lambda x: x['name']))
         self.assertListEqual([], state['blacklist'])
         self.assertListEqual([], device_skill_state['blacklist'])
         self.assertEqual(2, state['version'])

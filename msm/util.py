@@ -22,8 +22,8 @@
 import time
 
 import git
-from os.path import exists, join
 from os import chmod
+from os.path import exists, join
 from tempfile import gettempdir
 
 from fasteners.process_lock import InterProcessLock
@@ -50,6 +50,7 @@ class MsmProcessLock(InterProcessLock):
             lock_file.close()
             chmod(lock_path, 0o777)
         super().__init__(lock_path)
+
 
 # The cached_property class defined below was copied from the
 # PythonDecoratorLibrary at:
@@ -88,6 +89,7 @@ class cached_property(object):
         del instance._cache[<property name>]
 
     """
+
     def __init__(self, ttl=300):
         self.ttl = ttl
 
