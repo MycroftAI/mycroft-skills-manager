@@ -39,11 +39,11 @@ def required(requirements_file):
 
 setup(
     name='msm',
-    version='0.8.8',
+    version='0.9.0',
     packages=['msm'],
     install_requires=required('requirements/requirements.txt'),
     tests_require=required('requirements/tests.txt'),
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     url='https://github.com/MycroftAI/mycroft-skills-manager',
     license='Apache-2.0',
     author='jarbasAI, Matthew Scholefield, Mycroft AI',
@@ -55,7 +55,6 @@ setup(
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
