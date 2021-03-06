@@ -23,12 +23,12 @@
 
 MSM can be used on the command line but is also used by Mycroft core daemons.
 """
+from concurrent.futures import ThreadPoolExecutor
 import time
 import logging
 import shutil
 from functools import wraps
 from glob import glob
-from multiprocessing.pool import ThreadPool
 from os import path
 from typing import Dict, List
 
@@ -487,8 +487,8 @@ class MycroftSkillsManager(object):
                     func.__name__, skill.name
                 ))
 
-        with ThreadPool(max_threads) as tp:
-            return tp.map(run_item, skills)
+        with ThreadPoolExecutor(max_threads) as executor:
+            return executor.map(run_item, skills)
 
     @save_device_skill_state
     def install_defaults(self):
