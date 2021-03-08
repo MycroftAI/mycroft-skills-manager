@@ -68,7 +68,8 @@ def _perform_pako_install(packages, system_packages=None):
     """
     try:
         manager = PakoManager()
-        success = manager.install(packages, overrides=system_packages)
+        success = manager.install(
+            packages, overrides=system_packages, flags=['no-confirm'])
     except RuntimeError as e:
         LOG.warning('Failed to launch package manager: {}'.format(e))
         success = False
