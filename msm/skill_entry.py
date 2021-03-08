@@ -336,7 +336,8 @@ class SkillEntry(object):
         all_deps = system_packages.pop('all', [])
         try:
             manager = PakoManager()
-            success = manager.install(all_deps, overrides=system_packages)
+            success = manager.install(
+                all_deps, overrides=system_packages, flags=['no-confirm'])
         except RuntimeError as e:
             LOG.warning('Failed to launch package manager: {}'.format(e))
             success = False
