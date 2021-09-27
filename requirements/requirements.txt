@@ -1,4 +1,5 @@
-GitPython
+GitPython==3.0.9
+gitdb==4.0.4
 fasteners
 lazy
 pako>=0.3.1,<0.4.0
