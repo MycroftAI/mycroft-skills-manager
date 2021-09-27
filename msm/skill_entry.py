@@ -566,7 +566,7 @@ class SkillEntry(object):
                 'Attempting to retrieve the remote origin URL config for '
                 'skill in path ' + path
             )
-            return Git(path).config('remote.origin.url')
+            return Repo(path).remote('origin').url
         except GitError:
             return ''
 
