@@ -116,7 +116,7 @@ class SkillRepo(object):
         self.path = join(BaseDirectory.save_data_path('mycroft'),
                          'skills-repo')
         self.url = url or "https://github.com/MycroftAI/mycroft-skills"
-        self.branch = branch or "20.08"
+        self.branch = branch or "21.02"
         self.repo_info = {}
 
     @cached_property(ttl=FIVE_MINUTES)
