@@ -106,8 +106,8 @@ class MycroftSkillsManager(object):
 
         self.saving_handled = False
         self.device_skill_state_hash = ''
-        with self.lock:
-            self._init_skills_data()
+        # with self.lock:
+        #     self._init_skills_data()
 
     def clear_cache(self):
         """Completely clear the skills cache."""
