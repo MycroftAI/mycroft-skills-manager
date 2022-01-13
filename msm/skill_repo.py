@@ -101,33 +101,34 @@ class SkillRepo(object):
         if not isdir(self.path):
             Repo.clone_from(self.url, self.path)
 
-        git = Git(self.path)
-        git.config('remote.origin.url', self.url)
-        git.fetch()
+        # git = Git(self.path)
+        # git.config('remote.origin.url', self.url)
+        # git.fetch()
 
-        try:
-            git.checkout(self.branch)
-            git.reset('origin/' + self.branch, hard=True)
-        except GitCommandError:
-            raise MsmException('Invalid branch: ' + self.branch)
+        # try:
+        #     git.checkout(self.branch)
+        #     git.reset('origin/' + self.branch, hard=True)
+        # except GitCommandError:
+        #     raise MsmException('Invalid branch: ' + self.branch)
 
     def update(self):
-        try:
-            self.__prepare_repo()
-        except (GitError, PermissionError) as e:
-            LOG.warning('Could not prepare repo ({}), '
-                        ' Creating temporary repo'.format(repr(e)))
-            original_path = self.path
-            self.path = '/tmp/.skills-repo'
-            try:
-                with git_to_msm_exceptions():
-                    self.__prepare_repo()
-            except Exception:
-                LOG.warning('Could not use temporary repo either ({}), '
-                            ' trying to use existing one without '
-                            'update'.format(repr(e)))
-                self.path = original_path  # Restore path to previous value
-                raise
+        # try:
+        #     self.__prepare_repo()
+        # except (GitError, PermissionError) as e:
+        #     LOG.warning('Could not prepare repo ({}), '
+        #                 ' Creating temporary repo'.format(repr(e)))
+        #     original_path = self.path
+        #     self.path = '/tmp/.skills-repo'
+        #     try:
+        #         with git_to_msm_exceptions():
+        #             self.__prepare_repo()
+        #     except Exception:
+        #         LOG.warning('Could not use temporary repo either ({}), '
+        #                     ' trying to use existing one without '
+        #                     'update'.format(repr(e)))
+        #         self.path = original_path  # Restore path to previous value
+        #         raise
+        pass
 
     def get_skill_data(self):
         """ generates tuples of name, path, url, sha """

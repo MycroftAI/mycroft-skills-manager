@@ -155,19 +155,20 @@ class SkillEntry(object):
         - the skill is not a git repo
         - has local modifications
         """
-        if not exists(self.path):
-            return False
-        try:
-            checkout = Git(self.path)
-            mod = checkout.status(porcelain=True, untracked_files='no') != ''
-            current_sha = checkout.rev_parse('HEAD')
-        except GitCommandError:  # Not a git checkout
-            return True
+        # if not exists(self.path):
+        #     return False
+        # try:
+        #     checkout = Git(self.path)
+        #     mod = checkout.status(porcelain=True, untracked_files='no') != ''
+        #     current_sha = checkout.rev_parse('HEAD')
+        # except GitCommandError:  # Not a git checkout
+        #     return True
 
-        skill_shas = {d[0]: d[3] for d in self.msm.repo.get_skill_data()}
-        return (self.name not in skill_shas or
-                current_sha != skill_shas[self.name] or
-                mod)
+        # skill_shas = {d[0]: d[3] for d in self.msm.repo.get_skill_data()}
+        # return (self.name not in skill_shas or
+        #         current_sha != skill_shas[self.name] or
+        #         mod)
+        return False
 
     @cached_property(ttl=FIVE_MINUTES)
     def skill_gid(self):
@@ -509,36 +510,37 @@ class SkillEntry(object):
 
     @_backup_previous_version
     def update(self):
-        if not self.is_local:
-            raise NotInstalled('{} is not installed'.format(self.name))
-        git = Git(self.path)
+        # if not self.is_local:
+        #     raise NotInstalled('{} is not installed'.format(self.name))
+        # git = Git(self.path)
 
-        with git_to_msm_exceptions():
-            sha_before = git.rev_parse('HEAD')
+        # with git_to_msm_exceptions():
+        #     sha_before = git.rev_parse('HEAD')
 
-            modified_files = git.status(porcelain=True, untracked='no')
-            if modified_files != '':
-                raise SkillModified('Uncommitted changes:\n' + modified_files)
+        #     modified_files = git.status(porcelain=True, untracked='no')
+        #     if modified_files != '':
+        #         raise SkillModified('Uncommitted changes:\n' + modified_files)
 
-            git.fetch()
-            current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
-            if self.sha and current_branch in SWITCHABLE_BRANCHES:
-                # Check out correct branch
-                git.checkout(self._find_sha_branch())
+        #     git.fetch()
+        #     current_branch = git.rev_parse('--abbrev-ref', 'HEAD').strip()
+        #     if self.sha and current_branch in SWITCHABLE_BRANCHES:
+        #         # Check out correct branch
+        #         git.checkout(self._find_sha_branch())
 
-            git.merge(self.sha or 'origin/HEAD', ff_only=True)
+        #     git.merge(self.sha or 'origin/HEAD', ff_only=True)
 
-        sha_after = git.rev_parse('HEAD')
+        # sha_after = git.rev_parse('HEAD')
 
-        if sha_before != sha_after:
-            self.update_deps()
-            LOG.info('Updated ' + self.name)
-            # Trigger reload by modifying the timestamp
-            os.utime(join(self.path, '__init__.py'))
-            return True
-        else:
-            LOG.info('Nothing new for ' + self.name)
-            return False
+        # if sha_before != sha_after:
+        #     self.update_deps()
+        #     LOG.info('Updated ' + self.name)
+        #     # Trigger reload by modifying the timestamp
+        #     os.utime(join(self.path, '__init__.py'))
+        #     return True
+        # else:
+        #     LOG.info('Nothing new for ' + self.name)
+        #     return False
+        return False
 
     @staticmethod
     def find_git_url(path):
