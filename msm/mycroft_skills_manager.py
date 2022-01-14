@@ -114,7 +114,9 @@ class MycroftSkillsManager(object):
         self._device_skill_state = None
         self._invalidate_skills_cache()
 
-    @cached_property(ttl=ONE_DAY)
+    # Doesn't work without calling self._init_skills_data()
+    # @cached_property(ttl=ONE_DAY)
+
     def all_skills(self):
         """Getting a list of skills can take a while so cache it.
 
