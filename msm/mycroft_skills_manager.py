@@ -117,6 +117,7 @@ class MycroftSkillsManager(object):
     # Doesn't work without calling self._init_skills_data()
     # @cached_property(ttl=ONE_DAY)
 
+    @property
     def all_skills(self):
         """Getting a list of skills can take a while so cache it.
 
