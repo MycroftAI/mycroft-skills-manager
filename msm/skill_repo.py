@@ -153,7 +153,7 @@ class SkillRepo(object):
     def get_shas(self):
         git = Git(self.path)
         with git_to_msm_exceptions():
-            shas = git.ls_tree('origin/' + self.branch)
+            shas = git.ls_tree('origin')
         for line in shas.split('\n'):
             size, typ, sha, folder = line.split()
             if typ != 'commit':
